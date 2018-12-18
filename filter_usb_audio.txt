@@ -1,0 +1,15 @@
+@@ return
+audit_printk_skb
+bq_cc:
+bq_rm:
+healthd: 
+HXTP
+no longer affine to CPU
+mdss_
+msm_11ad
+wlan:
+selinux:
+synaptic
+USB_ICL:
+APSD_DEBUG
+audit:
