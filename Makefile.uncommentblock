@@ -1,0 +1,25 @@
+# uncommentblock:uncommentblock.c
+# 	gcc -g $^ -o $@
+
+# all:uncommentblock
+
+# %.o:%.c
+# 	gcc -g $^ -o $@
+
+# objects = uncommentblock  
+# all: $(objects) 
+# $(objects): %.o: %.c
+# 	echo $@
+# 	$(CC) -c $(CFLAGS) $< -o $@
+# 	$(CC) $@ -o $(objects)
+
+CC = gcc
+CFLAGS = -std=c99 -W -Wall # -g
+CFLAGSS = -std=c99 -W # -g
+LIBS = -lm
+
+uncommentblock : uncommentblock.o  
+	$(CC) $^ $(LIBS) -o $@  # -lcrypt -lssl -lcrypto # -g
+
+%.o : %.c
+	$(CC) $(CFLAGS) $< -c 
