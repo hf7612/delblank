@@ -1,1971 +1,964 @@
-# 1 "delblank.c"
-# 1 "<built-in>"
-# 1 "<命令行>"
-# 31 "<命令行>"
-# 1 "/usr/include/stdc-predef.h" 1 3 4
-# 32 "<命令行>" 2
-# 1 "delblank.c"
-# 24 "delblank.c"
-# 1 "/usr/include/stdio.h" 1 3 4
-# 27 "/usr/include/stdio.h" 3 4
-# 1 "/usr/include/bits/libc-header-start.h" 1 3 4
-# 33 "/usr/include/bits/libc-header-start.h" 3 4
-# 1 "/usr/include/features.h" 1 3 4
-# 428 "/usr/include/features.h" 3 4
-# 1 "/usr/include/sys/cdefs.h" 1 3 4
-# 427 "/usr/include/sys/cdefs.h" 3 4
-# 1 "/usr/include/bits/wordsize.h" 1 3 4
-# 428 "/usr/include/sys/cdefs.h" 2 3 4
-# 1 "/usr/include/bits/long-double.h" 1 3 4
-# 429 "/usr/include/sys/cdefs.h" 2 3 4
-# 429 "/usr/include/features.h" 2 3 4
-# 452 "/usr/include/features.h" 3 4
-# 1 "/usr/include/gnu/stubs.h" 1 3 4
-# 10 "/usr/include/gnu/stubs.h" 3 4
-# 1 "/usr/include/gnu/stubs-64.h" 1 3 4
-# 11 "/usr/include/gnu/stubs.h" 2 3 4
-# 453 "/usr/include/features.h" 2 3 4
-# 34 "/usr/include/bits/libc-header-start.h" 2 3 4
-# 28 "/usr/include/stdio.h" 2 3 4
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * Linux Socket Filter Data Structures
+ */
+#ifndef __LINUX_FILTER_H__
+#define __LINUX_FILTER_H__
+
+#include <stdarg.h>
 
+#include <linux/atomic.h>
+#include <linux/refcount.h>
+#include <linux/compat.h>
+#include <linux/skbuff.h>
+#include <linux/linkage.h>
+#include <linux/printk.h>
+#include <linux/workqueue.h>
+#include <linux/sched.h>
+#include <linux/capability.h>
+#include <linux/cryptohash.h>
+#include <linux/set_memory.h>
+#include <linux/kallsyms.h>
+#include <linux/if_vlan.h>
+#include <linux/vmalloc.h>
 
+#include <net/sch_generic.h>
 
+#include <asm/byteorder.h>
+#include <uapi/linux/filter.h>
+#include <uapi/linux/bpf.h>
 
+struct sk_buff;
+struct sock;
+struct seccomp_data;
+struct bpf_prog_aux;
+struct xdp_rxq_info;
+struct xdp_buff;
+struct sock_reuseport;
+struct ctl_table;
+struct ctl_table_header;
 
-# 1 "/usr/lib/gcc/x86_64-redhat-linux/8/include/stddef.h" 1 3 4
-# 216 "/usr/lib/gcc/x86_64-redhat-linux/8/include/stddef.h" 3 4
+/* ArgX, context and stack frame pointer register positions. Note,
+ * Arg1, Arg2, Arg3, etc are used as argument mappings of function
+ * calls in BPF_CALL instruction.
+ */
+#define BPF_REG_ARG1	BPF_REG_1
+#define BPF_REG_ARG2	BPF_REG_2
+#define BPF_REG_ARG3	BPF_REG_3
+#define BPF_REG_ARG4	BPF_REG_4
+#define BPF_REG_ARG5	BPF_REG_5
+#define BPF_REG_CTX	BPF_REG_6
+#define BPF_REG_FP	BPF_REG_10
 
-# 216 "/usr/lib/gcc/x86_64-redhat-linux/8/include/stddef.h" 3 4
-typedef long unsigned int size_t;
-# 34 "/usr/include/stdio.h" 2 3 4
+/* Additional register mappings for converted user programs. */
+#define BPF_REG_A	BPF_REG_0
+#define BPF_REG_X	BPF_REG_7
+#define BPF_REG_TMP	BPF_REG_2	/* scratch reg */
+#define BPF_REG_D	BPF_REG_8	/* data, callee-saved */
+#define BPF_REG_H	BPF_REG_9	/* hlen, callee-saved */
 
-# 1 "/usr/include/bits/types.h" 1 3 4
-# 27 "/usr/include/bits/types.h" 3 4
-# 1 "/usr/include/bits/wordsize.h" 1 3 4
-# 28 "/usr/include/bits/types.h" 2 3 4
+/* Kernel hidden auxiliary/helper register. */
+#define BPF_REG_AX		MAX_BPF_REG
+#define MAX_BPF_EXT_REG		(MAX_BPF_REG + 1)
+#define MAX_BPF_JIT_REG		MAX_BPF_EXT_REG
 
+/* unused opcode to mark special call to bpf_tail_call() helper */
+#define BPF_TAIL_CALL	0xf0
 
-typedef unsigned char __u_char;
-typedef unsigned short int __u_short;
-typedef unsigned int __u_int;
-typedef unsigned long int __u_long;
+/* unused opcode to mark call to interpreter with arguments */
+#define BPF_CALL_ARGS	0xe0
 
+/* As per nm, we expose JITed images as text (code) section for
+ * kallsyms. That way, tools like perf can find it to match
+ * addresses.
+ */
+#define BPF_SYM_ELF_TYPE	't'
 
-typedef signed char __int8_t;
-typedef unsigned char __uint8_t;
-typedef signed short int __int16_t;
-typedef unsigned short int __uint16_t;
-typedef signed int __int32_t;
-typedef unsigned int __uint32_t;
+/* BPF program can access up to 512 bytes of stack space. */
+#define MAX_BPF_STACK	512
 
-typedef signed long int __int64_t;
-typedef unsigned long int __uint64_t;
+/* Helper macros for filter block array initializers. */
 
+/* ALU ops on registers, bpf_add|sub|...: dst_reg += src_reg */
 
+#define BPF_ALU64_REG(OP, DST, SRC)				  	((struct bpf_insn) {					  		.code  = BPF_ALU64 | BPF_OP(OP) | BPF_X,	  		.dst_reg = DST,					  		.src_reg = SRC,					  		.off   = 0,					  		.imm   = 0 })
 
+#define BPF_ALU32_REG(OP, DST, SRC)				  	((struct bpf_insn) {					  		.code  = BPF_ALU | BPF_OP(OP) | BPF_X,		  		.dst_reg = DST,					  		.src_reg = SRC,					  		.off   = 0,					  		.imm   = 0 })
 
+/* ALU ops on immediates, bpf_add|sub|...: dst_reg += imm32 */
 
+#define BPF_ALU64_IMM(OP, DST, IMM)				  	((struct bpf_insn) {					  		.code  = BPF_ALU64 | BPF_OP(OP) | BPF_K,	  		.dst_reg = DST,					  		.src_reg = 0,					  		.off   = 0,					  		.imm   = IMM })
 
+#define BPF_ALU32_IMM(OP, DST, IMM)				  	((struct bpf_insn) {					  		.code  = BPF_ALU | BPF_OP(OP) | BPF_K,		  		.dst_reg = DST,					  		.src_reg = 0,					  		.off   = 0,					  		.imm   = IMM })
 
-typedef long int __quad_t;
-typedef unsigned long int __u_quad_t;
+/* Endianess conversion, cpu_to_{l,b}e(), {l,b}e_to_cpu() */
 
+#define BPF_ENDIAN(TYPE, DST, LEN)				  	((struct bpf_insn) {					  		.code  = BPF_ALU | BPF_END | BPF_SRC(TYPE),	  		.dst_reg = DST,					  		.src_reg = 0,					  		.off   = 0,					  		.imm   = LEN }) 
 
+/* Short form of mov, dst_reg = src_reg */
 
+#define BPF_MOV64_REG(DST, SRC)					  	((struct bpf_insn) {					  		.code  = BPF_ALU64 | BPF_MOV | BPF_X,		  		.dst_reg = DST,					  		.src_reg = SRC,					  		.off   = 0,					  		.imm   = 0 })
 
+#define BPF_MOV32_REG(DST, SRC)					  	((struct bpf_insn) {					  		.code  = BPF_ALU | BPF_MOV | BPF_X,		  		.dst_reg = DST,					  		.src_reg = SRC,					  		.off   = 0,					  		.imm   = 0 })
 
+/* Short form of mov, dst_reg = imm32 */
 
+#define BPF_MOV64_IMM(DST, IMM)					  	((struct bpf_insn) {					  		.code  = BPF_ALU64 | BPF_MOV | BPF_K,		  		.dst_reg = DST,					  		.src_reg = 0,					  		.off   = 0,					  		.imm   = IMM })
 
-typedef long int __intmax_t;
-typedef unsigned long int __uintmax_t;
-# 130 "/usr/include/bits/types.h" 3 4
-# 1 "/usr/include/bits/typesizes.h" 1 3 4
-# 131 "/usr/include/bits/types.h" 2 3 4
+#define BPF_MOV32_IMM(DST, IMM)					  	((struct bpf_insn) {					  		.code  = BPF_ALU | BPF_MOV | BPF_K,		  		.dst_reg = DST,					  		.src_reg = 0,					  		.off   = 0,					  		.imm   = IMM })
 
+/* Special form of mov32, used for doing explicit zero extension on dst. */
+#define BPF_ZEXT_REG(DST)					  	((struct bpf_insn) {					  		.code  = BPF_ALU | BPF_MOV | BPF_X,		  		.dst_reg = DST,					  		.src_reg = DST,					  		.off   = 0,					  		.imm   = 1 })
 
-typedef unsigned long int __dev_t;
-typedef unsigned int __uid_t;
-typedef unsigned int __gid_t;
-typedef unsigned long int __ino_t;
-typedef unsigned long int __ino64_t;
-typedef unsigned int __mode_t;
-typedef unsigned long int __nlink_t;
-typedef long int __off_t;
-typedef long int __off64_t;
-typedef int __pid_t;
-typedef struct { int __val[2]; } __fsid_t;
-typedef long int __clock_t;
-typedef unsigned long int __rlim_t;
-typedef unsigned long int __rlim64_t;
-typedef unsigned int __id_t;
-typedef long int __time_t;
-typedef unsigned int __useconds_t;
-typedef long int __suseconds_t;
-
-typedef int __daddr_t;
-typedef int __key_t;
-
-
-typedef int __clockid_t;
-
-
-typedef void * __timer_t;
-
-
-typedef long int __blksize_t;
-
-
-
-
-typedef long int __blkcnt_t;
-typedef long int __blkcnt64_t;
-
-
-typedef unsigned long int __fsblkcnt_t;
-typedef unsigned long int __fsblkcnt64_t;
-
-
-typedef unsigned long int __fsfilcnt_t;
-typedef unsigned long int __fsfilcnt64_t;
-
-
-typedef long int __fsword_t;
-
-typedef long int __ssize_t;
-
-
-typedef long int __syscall_slong_t;
-
-typedef unsigned long int __syscall_ulong_t;
-
-
-
-typedef __off64_t __loff_t;
-typedef char *__caddr_t;
-
-
-typedef long int __intptr_t;
-
-
-typedef unsigned int __socklen_t;
-
-
-
-
-typedef int __sig_atomic_t;
-# 36 "/usr/include/stdio.h" 2 3 4
-# 1 "/usr/include/bits/types/__FILE.h" 1 3 4
-
-
-
-struct _IO_FILE;
-typedef struct _IO_FILE __FILE;
-# 37 "/usr/include/stdio.h" 2 3 4
-# 1 "/usr/include/bits/types/FILE.h" 1 3 4
-
-
-
-struct _IO_FILE;
-
-
-typedef struct _IO_FILE FILE;
-# 38 "/usr/include/stdio.h" 2 3 4
-
-
-
-# 1 "/usr/include/bits/libio.h" 1 3 4
-# 35 "/usr/include/bits/libio.h" 3 4
-# 1 "/usr/include/bits/_G_config.h" 1 3 4
-# 19 "/usr/include/bits/_G_config.h" 3 4
-# 1 "/usr/lib/gcc/x86_64-redhat-linux/8/include/stddef.h" 1 3 4
-# 20 "/usr/include/bits/_G_config.h" 2 3 4
-
-# 1 "/usr/include/bits/types/__mbstate_t.h" 1 3 4
-# 13 "/usr/include/bits/types/__mbstate_t.h" 3 4
-typedef struct
+static inline bool insn_is_zext(const struct bpf_insn *insn)
 {
-  int __count;
-  union
-  {
-    unsigned int __wch;
-    char __wchb[4];
-  } __value;
-} __mbstate_t;
-# 22 "/usr/include/bits/_G_config.h" 2 3 4
-
-
-
-
-typedef struct
-{
-  __off_t __pos;
-  __mbstate_t __state;
-} _G_fpos_t;
-typedef struct
-{
-  __off64_t __pos;
-  __mbstate_t __state;
-} _G_fpos64_t;
-# 36 "/usr/include/bits/libio.h" 2 3 4
-# 53 "/usr/include/bits/libio.h" 3 4
-# 1 "/usr/lib/gcc/x86_64-redhat-linux/8/include/stdarg.h" 1 3 4
-# 40 "/usr/lib/gcc/x86_64-redhat-linux/8/include/stdarg.h" 3 4
-typedef __builtin_va_list __gnuc_va_list;
-# 54 "/usr/include/bits/libio.h" 2 3 4
-# 149 "/usr/include/bits/libio.h" 3 4
-struct _IO_jump_t; struct _IO_FILE;
-
-
-
-
-typedef void _IO_lock_t;
-
-
-
-
-
-struct _IO_marker {
-  struct _IO_marker *_next;
-  struct _IO_FILE *_sbuf;
-
-
-
-  int _pos;
-# 177 "/usr/include/bits/libio.h" 3 4
-};
-
-
-enum __codecvt_result
-{
-  __codecvt_ok,
-  __codecvt_partial,
-  __codecvt_error,
-  __codecvt_noconv
-};
-# 245 "/usr/include/bits/libio.h" 3 4
-struct _IO_FILE {
-  int _flags;
-
-
-
-
-  char* _IO_read_ptr;
-  char* _IO_read_end;
-  char* _IO_read_base;
-  char* _IO_write_base;
-  char* _IO_write_ptr;
-  char* _IO_write_end;
-  char* _IO_buf_base;
-  char* _IO_buf_end;
-
-  char *_IO_save_base;
-  char *_IO_backup_base;
-  char *_IO_save_end;
-
-  struct _IO_marker *_markers;
-
-  struct _IO_FILE *_chain;
-
-  int _fileno;
-
-
-
-  int _flags2;
-
-  __off_t _old_offset;
-
-
-
-  unsigned short _cur_column;
-  signed char _vtable_offset;
-  char _shortbuf[1];
-
-
-
-  _IO_lock_t *_lock;
-# 293 "/usr/include/bits/libio.h" 3 4
-  __off64_t _offset;
-
-
-
-
-
-
-
-  void *__pad1;
-  void *__pad2;
-  void *__pad3;
-  void *__pad4;
-
-  size_t __pad5;
-  int _mode;
-
-  char _unused2[15 * sizeof (int) - 4 * sizeof (void *) - sizeof (size_t)];
-
-};
-
-
-typedef struct _IO_FILE _IO_FILE;
-
-
-struct _IO_FILE_plus;
-
-extern struct _IO_FILE_plus _IO_2_1_stdin_;
-extern struct _IO_FILE_plus _IO_2_1_stdout_;
-extern struct _IO_FILE_plus _IO_2_1_stderr_;
-# 337 "/usr/include/bits/libio.h" 3 4
-typedef __ssize_t __io_read_fn (void *__cookie, char *__buf, size_t __nbytes);
-
-
-
-
-
-
-
-typedef __ssize_t __io_write_fn (void *__cookie, const char *__buf,
-     size_t __n);
-
-
-
-
-
-
-
-typedef int __io_seek_fn (void *__cookie, __off64_t *__pos, int __w);
-
-
-typedef int __io_close_fn (void *__cookie);
-# 389 "/usr/include/bits/libio.h" 3 4
-extern int __underflow (_IO_FILE *);
-extern int __uflow (_IO_FILE *);
-extern int __overflow (_IO_FILE *, int);
-# 433 "/usr/include/bits/libio.h" 3 4
-extern int _IO_getc (_IO_FILE *__fp);
-extern int _IO_putc (int __c, _IO_FILE *__fp);
-extern int _IO_feof (_IO_FILE *__fp) __attribute__ ((__nothrow__ , __leaf__));
-extern int _IO_ferror (_IO_FILE *__fp) __attribute__ ((__nothrow__ , __leaf__));
-
-extern int _IO_peekc_locked (_IO_FILE *__fp);
-
-
-
-
-
-extern void _IO_flockfile (_IO_FILE *) __attribute__ ((__nothrow__ , __leaf__));
-extern void _IO_funlockfile (_IO_FILE *) __attribute__ ((__nothrow__ , __leaf__));
-extern int _IO_ftrylockfile (_IO_FILE *) __attribute__ ((__nothrow__ , __leaf__));
-# 462 "/usr/include/bits/libio.h" 3 4
-extern int _IO_vfscanf (_IO_FILE * __restrict, const char * __restrict,
-   __gnuc_va_list, int *__restrict);
-extern int _IO_vfprintf (_IO_FILE *__restrict, const char *__restrict,
-    __gnuc_va_list);
-extern __ssize_t _IO_padn (_IO_FILE *, int, __ssize_t);
-extern size_t _IO_sgetn (_IO_FILE *, void *, size_t);
-
-extern __off64_t _IO_seekoff (_IO_FILE *, __off64_t, int, int);
-extern __off64_t _IO_seekpos (_IO_FILE *, __off64_t, int);
-
-extern void _IO_free_backup_area (_IO_FILE *) __attribute__ ((__nothrow__ , __leaf__));
-# 42 "/usr/include/stdio.h" 2 3 4
-
-
-
-
-typedef __gnuc_va_list va_list;
-# 57 "/usr/include/stdio.h" 3 4
-typedef __off_t off_t;
-# 71 "/usr/include/stdio.h" 3 4
-typedef __ssize_t ssize_t;
-
-
-
-
-
-
-typedef _G_fpos_t fpos_t;
-# 131 "/usr/include/stdio.h" 3 4
-# 1 "/usr/include/bits/stdio_lim.h" 1 3 4
-# 132 "/usr/include/stdio.h" 2 3 4
-
-
-
-extern struct _IO_FILE *stdin;
-extern struct _IO_FILE *stdout;
-extern struct _IO_FILE *stderr;
-
-
-
-
-
-
-extern int remove (const char *__filename) __attribute__ ((__nothrow__ , __leaf__));
-
-extern int rename (const char *__old, const char *__new) __attribute__ ((__nothrow__ , __leaf__));
-
-
-
-extern int renameat (int __oldfd, const char *__old, int __newfd,
-       const char *__new) __attribute__ ((__nothrow__ , __leaf__));
-
-
-
-
-
-
-
-extern FILE *tmpfile (void) ;
-# 173 "/usr/include/stdio.h" 3 4
-extern char *tmpnam (char *__s) __attribute__ ((__nothrow__ , __leaf__)) ;
-
-
-
-
-extern char *tmpnam_r (char *__s) __attribute__ ((__nothrow__ , __leaf__)) ;
-# 190 "/usr/include/stdio.h" 3 4
-extern char *tempnam (const char *__dir, const char *__pfx)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__malloc__)) ;
-
-
-
-
-
-
-
-extern int fclose (FILE *__stream);
-
-
-
-
-extern int fflush (FILE *__stream);
-# 213 "/usr/include/stdio.h" 3 4
-extern int fflush_unlocked (FILE *__stream);
-# 232 "/usr/include/stdio.h" 3 4
-extern FILE *fopen (const char *__restrict __filename,
-      const char *__restrict __modes) ;
-
-
-
-
-extern FILE *freopen (const char *__restrict __filename,
-        const char *__restrict __modes,
-        FILE *__restrict __stream) ;
-# 265 "/usr/include/stdio.h" 3 4
-extern FILE *fdopen (int __fd, const char *__modes) __attribute__ ((__nothrow__ , __leaf__)) ;
-# 278 "/usr/include/stdio.h" 3 4
-extern FILE *fmemopen (void *__s, size_t __len, const char *__modes)
-  __attribute__ ((__nothrow__ , __leaf__)) ;
-
-
-
-
-extern FILE *open_memstream (char **__bufloc, size_t *__sizeloc) __attribute__ ((__nothrow__ , __leaf__)) ;
-
-
-
-
-
-extern void setbuf (FILE *__restrict __stream, char *__restrict __buf) __attribute__ ((__nothrow__ , __leaf__));
-
-
-
-extern int setvbuf (FILE *__restrict __stream, char *__restrict __buf,
-      int __modes, size_t __n) __attribute__ ((__nothrow__ , __leaf__));
-
-
-
-
-extern void setbuffer (FILE *__restrict __stream, char *__restrict __buf,
-         size_t __size) __attribute__ ((__nothrow__ , __leaf__));
-
-
-extern void setlinebuf (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__));
-
-
-
-
-
-
-
-extern int fprintf (FILE *__restrict __stream,
-      const char *__restrict __format, ...);
-
-
-
-
-extern int printf (const char *__restrict __format, ...);
-
-extern int sprintf (char *__restrict __s,
-      const char *__restrict __format, ...) __attribute__ ((__nothrow__));
-
-
-
-
-
-extern int vfprintf (FILE *__restrict __s, const char *__restrict __format,
-       __gnuc_va_list __arg);
-
-
-
-
-extern int vprintf (const char *__restrict __format, __gnuc_va_list __arg);
-
-extern int vsprintf (char *__restrict __s, const char *__restrict __format,
-       __gnuc_va_list __arg) __attribute__ ((__nothrow__));
-
-
-
-extern int snprintf (char *__restrict __s, size_t __maxlen,
-       const char *__restrict __format, ...)
-     __attribute__ ((__nothrow__)) __attribute__ ((__format__ (__printf__, 3, 4)));
-
-extern int vsnprintf (char *__restrict __s, size_t __maxlen,
-        const char *__restrict __format, __gnuc_va_list __arg)
-     __attribute__ ((__nothrow__)) __attribute__ ((__format__ (__printf__, 3, 0)));
-# 365 "/usr/include/stdio.h" 3 4
-extern int vdprintf (int __fd, const char *__restrict __fmt,
-       __gnuc_va_list __arg)
-     __attribute__ ((__format__ (__printf__, 2, 0)));
-extern int dprintf (int __fd, const char *__restrict __fmt, ...)
-     __attribute__ ((__format__ (__printf__, 2, 3)));
-
-
-
-
-
-
-
-extern int fscanf (FILE *__restrict __stream,
-     const char *__restrict __format, ...) ;
-
-
-
-
-extern int scanf (const char *__restrict __format, ...) ;
-
-extern int sscanf (const char *__restrict __s,
-     const char *__restrict __format, ...) __attribute__ ((__nothrow__ , __leaf__));
-# 395 "/usr/include/stdio.h" 3 4
-extern int fscanf (FILE *__restrict __stream, const char *__restrict __format, ...) __asm__ ("" "__isoc99_fscanf")
-
-                               ;
-extern int scanf (const char *__restrict __format, ...) __asm__ ("" "__isoc99_scanf")
-                              ;
-extern int sscanf (const char *__restrict __s, const char *__restrict __format, ...) __asm__ ("" "__isoc99_sscanf") __attribute__ ((__nothrow__ , __leaf__))
-
-                      ;
-# 420 "/usr/include/stdio.h" 3 4
-extern int vfscanf (FILE *__restrict __s, const char *__restrict __format,
-      __gnuc_va_list __arg)
-     __attribute__ ((__format__ (__scanf__, 2, 0))) ;
-
-
-
-
-
-extern int vscanf (const char *__restrict __format, __gnuc_va_list __arg)
-     __attribute__ ((__format__ (__scanf__, 1, 0))) ;
-
-
-extern int vsscanf (const char *__restrict __s,
-      const char *__restrict __format, __gnuc_va_list __arg)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__format__ (__scanf__, 2, 0)));
-# 443 "/usr/include/stdio.h" 3 4
-extern int vfscanf (FILE *__restrict __s, const char *__restrict __format, __gnuc_va_list __arg) __asm__ ("" "__isoc99_vfscanf")
-
-
-
-     __attribute__ ((__format__ (__scanf__, 2, 0))) ;
-extern int vscanf (const char *__restrict __format, __gnuc_va_list __arg) __asm__ ("" "__isoc99_vscanf")
-
-     __attribute__ ((__format__ (__scanf__, 1, 0))) ;
-extern int vsscanf (const char *__restrict __s, const char *__restrict __format, __gnuc_va_list __arg) __asm__ ("" "__isoc99_vsscanf") __attribute__ ((__nothrow__ , __leaf__))
-
-
-
-     __attribute__ ((__format__ (__scanf__, 2, 0)));
-# 477 "/usr/include/stdio.h" 3 4
-extern int fgetc (FILE *__stream);
-extern int getc (FILE *__stream);
-
-
-
-
-
-extern int getchar (void);
-# 495 "/usr/include/stdio.h" 3 4
-extern int getc_unlocked (FILE *__stream);
-extern int getchar_unlocked (void);
-# 506 "/usr/include/stdio.h" 3 4
-extern int fgetc_unlocked (FILE *__stream);
-# 517 "/usr/include/stdio.h" 3 4
-extern int fputc (int __c, FILE *__stream);
-extern int putc (int __c, FILE *__stream);
-
-
-
-
-
-extern int putchar (int __c);
-# 537 "/usr/include/stdio.h" 3 4
-extern int fputc_unlocked (int __c, FILE *__stream);
-
-
-
-
-
-
-
-extern int putc_unlocked (int __c, FILE *__stream);
-extern int putchar_unlocked (int __c);
-
-
-
-
-
-
-extern int getw (FILE *__stream);
-
-
-extern int putw (int __w, FILE *__stream);
-
-
-
-
-
-
-
-extern char *fgets (char *__restrict __s, int __n, FILE *__restrict __stream)
-     ;
-# 603 "/usr/include/stdio.h" 3 4
-extern __ssize_t __getdelim (char **__restrict __lineptr,
-          size_t *__restrict __n, int __delimiter,
-          FILE *__restrict __stream) ;
-extern __ssize_t getdelim (char **__restrict __lineptr,
-        size_t *__restrict __n, int __delimiter,
-        FILE *__restrict __stream) ;
-
-
-
-
-
-
-
-extern __ssize_t getline (char **__restrict __lineptr,
-       size_t *__restrict __n,
-       FILE *__restrict __stream) ;
-
-
-
-
-
-
-
-extern int fputs (const char *__restrict __s, FILE *__restrict __stream);
-
-
-
-
-
-extern int puts (const char *__s);
-
-
-
-
-
-
-extern int ungetc (int __c, FILE *__stream);
-
-
-
-
-
-
-extern size_t fread (void *__restrict __ptr, size_t __size,
-       size_t __n, FILE *__restrict __stream) ;
-
-
-
-
-extern size_t fwrite (const void *__restrict __ptr, size_t __size,
-        size_t __n, FILE *__restrict __s);
-# 673 "/usr/include/stdio.h" 3 4
-extern size_t fread_unlocked (void *__restrict __ptr, size_t __size,
-         size_t __n, FILE *__restrict __stream) ;
-extern size_t fwrite_unlocked (const void *__restrict __ptr, size_t __size,
-          size_t __n, FILE *__restrict __stream);
-
-
-
-
-
-
-
-extern int fseek (FILE *__stream, long int __off, int __whence);
-
-
-
-
-extern long int ftell (FILE *__stream) ;
-
-
-
-
-extern void rewind (FILE *__stream);
-# 707 "/usr/include/stdio.h" 3 4
-extern int fseeko (FILE *__stream, __off_t __off, int __whence);
-
-
-
-
-extern __off_t ftello (FILE *__stream) ;
-# 731 "/usr/include/stdio.h" 3 4
-extern int fgetpos (FILE *__restrict __stream, fpos_t *__restrict __pos);
-
-
-
-
-extern int fsetpos (FILE *__stream, const fpos_t *__pos);
-# 757 "/usr/include/stdio.h" 3 4
-extern void clearerr (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__));
-
-extern int feof (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) ;
-
-extern int ferror (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) ;
-
-
-
-extern void clearerr_unlocked (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__));
-extern int feof_unlocked (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) ;
-extern int ferror_unlocked (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) ;
-
-
-
-
-
-
-
-extern void perror (const char *__s);
-
-
-
-
-
-# 1 "/usr/include/bits/sys_errlist.h" 1 3 4
-# 26 "/usr/include/bits/sys_errlist.h" 3 4
-extern int sys_nerr;
-extern const char *const sys_errlist[];
-# 782 "/usr/include/stdio.h" 2 3 4
-
-
-
-
-extern int fileno (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) ;
-
-
-
-
-extern int fileno_unlocked (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) ;
-# 800 "/usr/include/stdio.h" 3 4
-extern FILE *popen (const char *__command, const char *__modes) ;
-
-
-
-
-
-extern int pclose (FILE *__stream);
-
-
-
-
-
-extern char *ctermid (char *__s) __attribute__ ((__nothrow__ , __leaf__));
-# 840 "/usr/include/stdio.h" 3 4
-extern void flockfile (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__));
-
-
-
-extern int ftrylockfile (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) ;
-
-
-extern void funlockfile (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__));
-# 868 "/usr/include/stdio.h" 3 4
-
-# 25 "delblank.c" 2
-# 1 "/usr/include/stdlib.h" 1 3 4
-# 25 "/usr/include/stdlib.h" 3 4
-# 1 "/usr/include/bits/libc-header-start.h" 1 3 4
-# 26 "/usr/include/stdlib.h" 2 3 4
-
-
-
-
-
-# 1 "/usr/lib/gcc/x86_64-redhat-linux/8/include/stddef.h" 1 3 4
-# 328 "/usr/lib/gcc/x86_64-redhat-linux/8/include/stddef.h" 3 4
-typedef int wchar_t;
-# 32 "/usr/include/stdlib.h" 2 3 4
-
-
-
-
-
-
-
-# 1 "/usr/include/bits/waitflags.h" 1 3 4
-# 40 "/usr/include/stdlib.h" 2 3 4
-# 1 "/usr/include/bits/waitstatus.h" 1 3 4
-# 41 "/usr/include/stdlib.h" 2 3 4
-# 55 "/usr/include/stdlib.h" 3 4
-# 1 "/usr/include/bits/floatn.h" 1 3 4
-# 119 "/usr/include/bits/floatn.h" 3 4
-# 1 "/usr/include/bits/floatn-common.h" 1 3 4
-# 24 "/usr/include/bits/floatn-common.h" 3 4
-# 1 "/usr/include/bits/long-double.h" 1 3 4
-# 25 "/usr/include/bits/floatn-common.h" 2 3 4
-# 120 "/usr/include/bits/floatn.h" 2 3 4
-# 56 "/usr/include/stdlib.h" 2 3 4
-
-
-typedef struct
-  {
-    int quot;
-    int rem;
-  } div_t;
-
-
-
-typedef struct
-  {
-    long int quot;
-    long int rem;
-  } ldiv_t;
-
-
-
-
-
-__extension__ typedef struct
-  {
-    long long int quot;
-    long long int rem;
-  } lldiv_t;
-# 97 "/usr/include/stdlib.h" 3 4
-extern size_t __ctype_get_mb_cur_max (void) __attribute__ ((__nothrow__ , __leaf__)) ;
-
-
-
-extern double atof (const char *__nptr)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__pure__)) __attribute__ ((__nonnull__ (1))) ;
-
-extern int atoi (const char *__nptr)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__pure__)) __attribute__ ((__nonnull__ (1))) ;
-
-extern long int atol (const char *__nptr)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__pure__)) __attribute__ ((__nonnull__ (1))) ;
-
-
-
-__extension__ extern long long int atoll (const char *__nptr)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__pure__)) __attribute__ ((__nonnull__ (1))) ;
-
-
-
-extern double strtod (const char *__restrict __nptr,
-        char **__restrict __endptr)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-
-
-
-extern float strtof (const char *__restrict __nptr,
-       char **__restrict __endptr) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-
-extern long double strtold (const char *__restrict __nptr,
-       char **__restrict __endptr)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-# 176 "/usr/include/stdlib.h" 3 4
-extern long int strtol (const char *__restrict __nptr,
-   char **__restrict __endptr, int __base)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-
-extern unsigned long int strtoul (const char *__restrict __nptr,
-      char **__restrict __endptr, int __base)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-
-
-
-__extension__
-extern long long int strtoq (const char *__restrict __nptr,
-        char **__restrict __endptr, int __base)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-
-__extension__
-extern unsigned long long int strtouq (const char *__restrict __nptr,
-           char **__restrict __endptr, int __base)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-
-
-
-
-__extension__
-extern long long int strtoll (const char *__restrict __nptr,
-         char **__restrict __endptr, int __base)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-
-__extension__
-extern unsigned long long int strtoull (const char *__restrict __nptr,
-     char **__restrict __endptr, int __base)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-# 385 "/usr/include/stdlib.h" 3 4
-extern char *l64a (long int __n) __attribute__ ((__nothrow__ , __leaf__)) ;
-
-
-extern long int a64l (const char *__s)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__pure__)) __attribute__ ((__nonnull__ (1))) ;
-
-
-
-
-# 1 "/usr/include/sys/types.h" 1 3 4
-# 27 "/usr/include/sys/types.h" 3 4
-
-
-
-
-
-
-typedef __u_char u_char;
-typedef __u_short u_short;
-typedef __u_int u_int;
-typedef __u_long u_long;
-typedef __quad_t quad_t;
-typedef __u_quad_t u_quad_t;
-typedef __fsid_t fsid_t;
-
-
-
-
-typedef __loff_t loff_t;
-
-
-
-typedef __ino_t ino_t;
-# 60 "/usr/include/sys/types.h" 3 4
-typedef __dev_t dev_t;
-
-
-
-
-typedef __gid_t gid_t;
-
-
-
-
-typedef __mode_t mode_t;
-
-
-
-
-typedef __nlink_t nlink_t;
-
-
-
-
-typedef __uid_t uid_t;
-# 98 "/usr/include/sys/types.h" 3 4
-typedef __pid_t pid_t;
-
-
-
-
-
-typedef __id_t id_t;
-# 115 "/usr/include/sys/types.h" 3 4
-typedef __daddr_t daddr_t;
-typedef __caddr_t caddr_t;
-
-
-
-
-
-typedef __key_t key_t;
-
-
-
-
-# 1 "/usr/include/bits/types/clock_t.h" 1 3 4
-
-
-
-
-
-
-typedef __clock_t clock_t;
-# 128 "/usr/include/sys/types.h" 2 3 4
-
-# 1 "/usr/include/bits/types/clockid_t.h" 1 3 4
-
-
-
-
-
-
-typedef __clockid_t clockid_t;
-# 130 "/usr/include/sys/types.h" 2 3 4
-# 1 "/usr/include/bits/types/time_t.h" 1 3 4
-
-
-
-
-
-
-typedef __time_t time_t;
-# 131 "/usr/include/sys/types.h" 2 3 4
-# 1 "/usr/include/bits/types/timer_t.h" 1 3 4
-
-
-
-
-
-
-typedef __timer_t timer_t;
-# 132 "/usr/include/sys/types.h" 2 3 4
-# 145 "/usr/include/sys/types.h" 3 4
-# 1 "/usr/lib/gcc/x86_64-redhat-linux/8/include/stddef.h" 1 3 4
-# 146 "/usr/include/sys/types.h" 2 3 4
-
-
-
-typedef unsigned long int ulong;
-typedef unsigned short int ushort;
-typedef unsigned int uint;
-
-
-
-
-# 1 "/usr/include/bits/stdint-intn.h" 1 3 4
-# 24 "/usr/include/bits/stdint-intn.h" 3 4
-typedef __int8_t int8_t;
-typedef __int16_t int16_t;
-typedef __int32_t int32_t;
-typedef __int64_t int64_t;
-# 157 "/usr/include/sys/types.h" 2 3 4
-# 178 "/usr/include/sys/types.h" 3 4
-typedef unsigned int u_int8_t __attribute__ ((__mode__ (__QI__)));
-typedef unsigned int u_int16_t __attribute__ ((__mode__ (__HI__)));
-typedef unsigned int u_int32_t __attribute__ ((__mode__ (__SI__)));
-typedef unsigned int u_int64_t __attribute__ ((__mode__ (__DI__)));
-
-typedef int register_t __attribute__ ((__mode__ (__word__)));
-# 194 "/usr/include/sys/types.h" 3 4
-# 1 "/usr/include/endian.h" 1 3 4
-# 36 "/usr/include/endian.h" 3 4
-# 1 "/usr/include/bits/endian.h" 1 3 4
-# 37 "/usr/include/endian.h" 2 3 4
-# 60 "/usr/include/endian.h" 3 4
-# 1 "/usr/include/bits/byteswap.h" 1 3 4
-# 28 "/usr/include/bits/byteswap.h" 3 4
-# 1 "/usr/include/bits/wordsize.h" 1 3 4
-# 29 "/usr/include/bits/byteswap.h" 2 3 4
-
-
-
-
-
-
-# 1 "/usr/include/bits/byteswap-16.h" 1 3 4
-# 36 "/usr/include/bits/byteswap.h" 2 3 4
-# 44 "/usr/include/bits/byteswap.h" 3 4
-static __inline unsigned int
-__bswap_32 (unsigned int __bsx)
-{
-  return __builtin_bswap32 (__bsx);
-}
-# 108 "/usr/include/bits/byteswap.h" 3 4
-static __inline __uint64_t
-__bswap_64 (__uint64_t __bsx)
-{
-  return __builtin_bswap64 (__bsx);
-}
-# 61 "/usr/include/endian.h" 2 3 4
-# 1 "/usr/include/bits/uintn-identity.h" 1 3 4
-# 32 "/usr/include/bits/uintn-identity.h" 3 4
-static __inline __uint16_t
-__uint16_identity (__uint16_t __x)
-{
-  return __x;
+	return insn->code == (BPF_ALU | BPF_MOV | BPF_X) && insn->imm == 1;
 }
 
-static __inline __uint32_t
-__uint32_identity (__uint32_t __x)
+/* BPF_LD_IMM64 macro encodes single 'load 64-bit immediate' insn */
+#define BPF_LD_IMM64(DST, IMM)					  	BPF_LD_IMM64_RAW(DST, 0, IMM)
+
+#define BPF_LD_IMM64_RAW(DST, SRC, IMM)				  	((struct bpf_insn) {					  		.code  = BPF_LD | BPF_DW | BPF_IMM,		  		.dst_reg = DST,					  		.src_reg = SRC,					  		.off   = 0,					  		.imm   = (__u32) (IMM) }),			  	((struct bpf_insn) {					  		.code  = 0, /* zero is reserved opcode */	  		.dst_reg = 0,					  		.src_reg = 0,					  		.off   = 0,					  		.imm   = ((__u64) (IMM)) >> 32 })
+
+/* pseudo BPF_LD_IMM64 insn used to refer to process-local map_fd */
+#define BPF_LD_MAP_FD(DST, MAP_FD)				  	BPF_LD_IMM64_RAW(DST, BPF_PSEUDO_MAP_FD, MAP_FD)
+
+/* Short form of mov based on type, BPF_X: dst_reg = src_reg, BPF_K: dst_reg = imm32 */
+
+#define BPF_MOV64_RAW(TYPE, DST, SRC, IMM)			  	((struct bpf_insn) {					  		.code  = BPF_ALU64 | BPF_MOV | BPF_SRC(TYPE),	  		.dst_reg = DST,					  		.src_reg = SRC,					  		.off   = 0,					  		.imm   = IMM })
+
+#define BPF_MOV32_RAW(TYPE, DST, SRC, IMM)			  	((struct bpf_insn) {					  		.code  = BPF_ALU | BPF_MOV | BPF_SRC(TYPE),	  		.dst_reg = DST,					  		.src_reg = SRC,					  		.off   = 0,					  		.imm   = IMM })
+
+/* Direct packet access, R0 = *(uint *) (skb->data + imm32) */
+
+#define BPF_LD_ABS(SIZE, IMM)					  	((struct bpf_insn) {					  		.code  = BPF_LD | BPF_SIZE(SIZE) | BPF_ABS,	  		.dst_reg = 0,					  		.src_reg = 0,					  		.off   = 0,					  		.imm   = IMM })
+
+/* Indirect packet access, R0 = *(uint *) (skb->data + src_reg + imm32) */
+
+#define BPF_LD_IND(SIZE, SRC, IMM)				  	((struct bpf_insn) {					  		.code  = BPF_LD | BPF_SIZE(SIZE) | BPF_IND,	  		.dst_reg = 0,					  		.src_reg = SRC,					  		.off   = 0,					  		.imm   = IMM })
+
+/* Memory load, dst_reg = *(uint *) (src_reg + off16) */
+
+#define BPF_LDX_MEM(SIZE, DST, SRC, OFF)			  	((struct bpf_insn) {					  		.code  = BPF_LDX | BPF_SIZE(SIZE) | BPF_MEM,	  		.dst_reg = DST,					  		.src_reg = SRC,					  		.off   = OFF,					  		.imm   = 0 })
+
+/* Memory store, *(uint *) (dst_reg + off16) = src_reg */
+
+#define BPF_STX_MEM(SIZE, DST, SRC, OFF)			  	((struct bpf_insn) {					  		.code  = BPF_STX | BPF_SIZE(SIZE) | BPF_MEM,	  		.dst_reg = DST,					  		.src_reg = SRC,					  		.off   = OFF,					  		.imm   = 0 })
+
+/* Atomic memory add, *(uint *)(dst_reg + off16) += src_reg */
+
+#define BPF_STX_XADD(SIZE, DST, SRC, OFF)			  	((struct bpf_insn) {					  		.code  = BPF_STX | BPF_SIZE(SIZE) | BPF_XADD,	  		.dst_reg = DST,					  		.src_reg = SRC,					  		.off   = OFF,					  		.imm   = 0 })
+
+/* Memory store, *(uint *) (dst_reg + off16) = imm32 */
+
+#define BPF_ST_MEM(SIZE, DST, OFF, IMM)				  	((struct bpf_insn) {					  		.code  = BPF_ST | BPF_SIZE(SIZE) | BPF_MEM,	  		.dst_reg = DST,					  		.src_reg = 0,					  		.off   = OFF,					  		.imm   = IMM })
+
+/* Conditional jumps against registers, if (dst_reg 'op' src_reg) goto pc + off16 */
+
+#define BPF_JMP_REG(OP, DST, SRC, OFF)				  	((struct bpf_insn) {					  		.code  = BPF_JMP | BPF_OP(OP) | BPF_X,		  		.dst_reg = DST,					  		.src_reg = SRC,					  		.off   = OFF,					  		.imm   = 0 })
+
+/* Conditional jumps against immediates, if (dst_reg 'op' imm32) goto pc + off16 */
+
+#define BPF_JMP_IMM(OP, DST, IMM, OFF)				  	((struct bpf_insn) {					  		.code  = BPF_JMP | BPF_OP(OP) | BPF_K,		  		.dst_reg = DST,					  		.src_reg = 0,					  		.off   = OFF,					  		.imm   = IMM })
+
+/* Like BPF_JMP_REG, but with 32-bit wide operands for comparison. */
+
+#define BPF_JMP32_REG(OP, DST, SRC, OFF)			  	((struct bpf_insn) {					  		.code  = BPF_JMP32 | BPF_OP(OP) | BPF_X,	  		.dst_reg = DST,					  		.src_reg = SRC,					  		.off   = OFF,					  		.imm   = 0 })
+
+/* Like BPF_JMP_IMM, but with 32-bit wide operands for comparison. */
+
+#define BPF_JMP32_IMM(OP, DST, IMM, OFF)			  	((struct bpf_insn) {					  		.code  = BPF_JMP32 | BPF_OP(OP) | BPF_K,	  		.dst_reg = DST,					  		.src_reg = 0,					  		.off   = OFF,					  		.imm   = IMM })
+
+/* Unconditional jumps, goto pc + off16 */
+
+#define BPF_JMP_A(OFF)						  	((struct bpf_insn) {					  		.code  = BPF_JMP | BPF_JA,			  		.dst_reg = 0,					  		.src_reg = 0,					  		.off   = OFF,					  		.imm   = 0 })
+
+/* Relative call */
+
+#define BPF_CALL_REL(TGT)					  	((struct bpf_insn) {					  		.code  = BPF_JMP | BPF_CALL,			  		.dst_reg = 0,					  		.src_reg = BPF_PSEUDO_CALL,			  		.off   = 0,					  		.imm   = TGT })
+
+/* Function call */
+
+#define BPF_CAST_CALL(x)					  		((u64 (*)(u64, u64, u64, u64, u64))(x))
+
+#define BPF_EMIT_CALL(FUNC)					  	((struct bpf_insn) {					  		.code  = BPF_JMP | BPF_CALL,			  		.dst_reg = 0,					  		.src_reg = 0,					  		.off   = 0,					  		.imm   = ((FUNC) - __bpf_call_base) })
+
+/* Raw code statement block */
+
+#define BPF_RAW_INSN(CODE, DST, SRC, OFF, IMM)			  	((struct bpf_insn) {					  		.code  = CODE,					  		.dst_reg = DST,					  		.src_reg = SRC,					  		.off   = OFF,					  		.imm   = IMM })
+
+/* Program exit */
+
+#define BPF_EXIT_INSN()						  	((struct bpf_insn) {					  		.code  = BPF_JMP | BPF_EXIT,			  		.dst_reg = 0,					  		.src_reg = 0,					  		.off   = 0,					  		.imm   = 0 })
+
+/* Internal classic blocks for direct assignment */
+
+#define __BPF_STMT(CODE, K)					  	((struct sock_filter) BPF_STMT(CODE, K))
+
+#define __BPF_JUMP(CODE, K, JT, JF)				  	((struct sock_filter) BPF_JUMP(CODE, K, JT, JF))
+
+#define bytes_to_bpf_size(bytes)				  ({								  	int bpf_size = -EINVAL;					  								  	if (bytes == sizeof(u8))				  		bpf_size = BPF_B;				  	else if (bytes == sizeof(u16))				  		bpf_size = BPF_H;				  	else if (bytes == sizeof(u32))				  		bpf_size = BPF_W;				  	else if (bytes == sizeof(u64))				  		bpf_size = BPF_DW;				  								  	bpf_size;						  })
+
+#define bpf_size_to_bytes(bpf_size)				  ({								  	int bytes = -EINVAL;					  								  	if (bpf_size == BPF_B)					  		bytes = sizeof(u8);				  	else if (bpf_size == BPF_H)				  		bytes = sizeof(u16);				  	else if (bpf_size == BPF_W)				  		bytes = sizeof(u32);				  	else if (bpf_size == BPF_DW)				  		bytes = sizeof(u64);				  								  	bytes;							  })
+
+#define BPF_SIZEOF(type)					  	({							  		const int __size = bytes_to_bpf_size(sizeof(type));   		BUILD_BUG_ON(__size < 0);			  		__size;						  	})
+
+#define BPF_FIELD_SIZEOF(type, field)				  	({							  		const int __size = bytes_to_bpf_size(FIELD_SIZEOF(type, field));   		BUILD_BUG_ON(__size < 0);			  		__size;						  	})
+
+#define BPF_LDST_BYTES(insn)					  	({							  		const int __size = bpf_size_to_bytes(BPF_SIZE((insn)->code));   		WARN_ON(__size < 0);				  		__size;						  	})
+
+#define __BPF_MAP_0(m, v, ...) v
+#define __BPF_MAP_1(m, v, t, a, ...) m(t, a)
+#define __BPF_MAP_2(m, v, t, a, ...) m(t, a), __BPF_MAP_1(m, v, __VA_ARGS__)
+#define __BPF_MAP_3(m, v, t, a, ...) m(t, a), __BPF_MAP_2(m, v, __VA_ARGS__)
+#define __BPF_MAP_4(m, v, t, a, ...) m(t, a), __BPF_MAP_3(m, v, __VA_ARGS__)
+#define __BPF_MAP_5(m, v, t, a, ...) m(t, a), __BPF_MAP_4(m, v, __VA_ARGS__)
+
+#define __BPF_REG_0(...) __BPF_PAD(5)
+#define __BPF_REG_1(...) __BPF_MAP(1, __VA_ARGS__), __BPF_PAD(4)
+#define __BPF_REG_2(...) __BPF_MAP(2, __VA_ARGS__), __BPF_PAD(3)
+#define __BPF_REG_3(...) __BPF_MAP(3, __VA_ARGS__), __BPF_PAD(2)
+#define __BPF_REG_4(...) __BPF_MAP(4, __VA_ARGS__), __BPF_PAD(1)
+#define __BPF_REG_5(...) __BPF_MAP(5, __VA_ARGS__)
+
+#define __BPF_MAP(n, ...) __BPF_MAP_##n(__VA_ARGS__)
+#define __BPF_REG(n, ...) __BPF_REG_##n(__VA_ARGS__)
+
+#define __BPF_CAST(t, a)						         	(__force t)							         	(__force							         	 typeof(__builtin_choose_expr(sizeof(t) == sizeof(unsigned long),        				      (unsigned long)0, (t)0))) a
+#define __BPF_V void
+#define __BPF_N
+
+#define __BPF_DECL_ARGS(t, a) t   a
+#define __BPF_DECL_REGS(t, a) u64 a
+
+#define __BPF_PAD(n)							         	__BPF_MAP(n, __BPF_DECL_ARGS, __BPF_N, u64, __ur_1, u64, __ur_2,         		  u64, __ur_3, u64, __ur_4, u64, __ur_5)
+
+#define BPF_CALL_x(x, name, ...)					         	static __always_inline						         	u64 ____##name(__BPF_MAP(x, __BPF_DECL_ARGS, __BPF_V, __VA_ARGS__));     	u64 name(__BPF_REG(x, __BPF_DECL_REGS, __BPF_N, __VA_ARGS__));	         	u64 name(__BPF_REG(x, __BPF_DECL_REGS, __BPF_N, __VA_ARGS__))	         	{								         		return ____##name(__BPF_MAP(x,__BPF_CAST,__BPF_N,__VA_ARGS__));  	}								         	static __always_inline						         	u64 ____##name(__BPF_MAP(x, __BPF_DECL_ARGS, __BPF_V, __VA_ARGS__))
+
+#define BPF_CALL_0(name, ...)	BPF_CALL_x(0, name, __VA_ARGS__)
+#define BPF_CALL_1(name, ...)	BPF_CALL_x(1, name, __VA_ARGS__)
+#define BPF_CALL_2(name, ...)	BPF_CALL_x(2, name, __VA_ARGS__)
+#define BPF_CALL_3(name, ...)	BPF_CALL_x(3, name, __VA_ARGS__)
+#define BPF_CALL_4(name, ...)	BPF_CALL_x(4, name, __VA_ARGS__)
+#define BPF_CALL_5(name, ...)	BPF_CALL_x(5, name, __VA_ARGS__)
+
+#define bpf_ctx_range(TYPE, MEMBER)						  	offsetof(TYPE, MEMBER) ... offsetofend(TYPE, MEMBER) - 1
+#define bpf_ctx_range_till(TYPE, MEMBER1, MEMBER2)				  	offsetof(TYPE, MEMBER1) ... offsetofend(TYPE, MEMBER2) - 1
+#if BITS_PER_LONG == 64
+# define bpf_ctx_range_ptr(TYPE, MEMBER)					  	offsetof(TYPE, MEMBER) ... offsetofend(TYPE, MEMBER) - 1
+#else
+# define bpf_ctx_range_ptr(TYPE, MEMBER)					  	offsetof(TYPE, MEMBER) ... offsetof(TYPE, MEMBER) + 8 - 1
+#endif /* BITS_PER_LONG == 64 */
+
+#define bpf_target_off(TYPE, MEMBER, SIZE, PTR_SIZE)				  	({									  		BUILD_BUG_ON(FIELD_SIZEOF(TYPE, MEMBER) != (SIZE));		  		*(PTR_SIZE) = (SIZE);						  		offsetof(TYPE, MEMBER);						  	})
+
+#ifdef CONFIG_COMPAT
+/* A struct sock_filter is architecture independent. */
+struct compat_sock_fprog {
+	u16		len;
+	compat_uptr_t	filter;	/* struct sock_filter * */
+};
+#endif
+
+struct sock_fprog_kern {
+	u16			len;
+	struct sock_filter	*filter;
+};
+
+struct bpf_binary_header {
+	u32 pages;
+	/* Some arches need word alignment for their instructions */
+	u8 image[] __aligned(4);
+};
+
+struct bpf_prog {
+	u16			pages;		/* Number of allocated pages */
+	u16			jited:1,	/* Is our filter JIT'ed? */
+				jit_requested:1,/* archs need to JIT the prog */
+				gpl_compatible:1, /* Is filter GPL compatible? */
+				cb_access:1,	/* Is control block accessed? */
+				dst_needed:1,	/* Do we need dst entry? */
+				blinded:1,	/* Was blinded */
+				is_func:1,	/* program is a bpf function */
+				kprobe_override:1, /* Do we override a kprobe? */
+				has_callchain_buf:1, /* callchain buffer allocated? */
+				enforce_expected_attach_type:1; /* Enforce expected_attach_type checking at attach time */
+	enum bpf_prog_type	type;		/* Type of BPF program */
+	enum bpf_attach_type	expected_attach_type; /* For some prog types */
+	u32			len;		/* Number of filter blocks */
+	u32			jited_len;	/* Size of jited insns in bytes */
+	u8			tag[BPF_TAG_SIZE];
+	struct bpf_prog_aux	*aux;		/* Auxiliary fields */
+	struct sock_fprog_kern	*orig_prog;	/* Original BPF program */
+	unsigned int		(*bpf_func)(const void *ctx,
+					    const struct bpf_insn *insn);
+	/* Instructions for interpreter */
+	union {
+		struct sock_filter	insns[0];
+		struct bpf_insn		insnsi[0];
+	};
+};
+
+struct sk_filter {
+	refcount_t	refcnt;
+	struct rcu_head	rcu;
+	struct bpf_prog	*prog;
+};
+
+DECLARE_STATIC_KEY_FALSE(bpf_stats_enabled_key);
+
+#define BPF_PROG_RUN(prog, ctx)	({				  	u32 ret;						  	cant_sleep();						  	if (static_branch_unlikely(&bpf_stats_enabled_key)) {	  		struct bpf_prog_stats *stats;			  		u64 start = sched_clock();			  		ret = (*(prog)->bpf_func)(ctx, (prog)->insnsi);	  		stats = this_cpu_ptr(prog->aux->stats);		  		u64_stats_update_begin(&stats->syncp);		  		stats->cnt++;					  		stats->nsecs += sched_clock() - start;		  		u64_stats_update_end(&stats->syncp);		  	} else {						  		ret = (*(prog)->bpf_func)(ctx, (prog)->insnsi);	  	}							  	ret; })
+
+#define BPF_SKB_CB_LEN QDISC_CB_PRIV_LEN
+
+struct bpf_skb_data_end {
+	struct qdisc_skb_cb qdisc_cb;
+	void *data_meta;
+	void *data_end;
+};
+
+struct bpf_redirect_info {
+	u32 flags;
+	u32 tgt_index;
+	void *tgt_value;
+	struct bpf_map *map;
+	struct bpf_map *map_to_flush;
+	u32 kern_flags;
+};
+
+DECLARE_PER_CPU(struct bpf_redirect_info, bpf_redirect_info);
+
+/* flags for bpf_redirect_info kern_flags */
+#define BPF_RI_F_RF_NO_DIRECT	BIT(0)	/* no napi_direct on return_frame */
+
+/* Compute the linear packet data range [data, data_end) which
+ * will be accessed by various program types (cls_bpf, act_bpf,
+ * lwt, ...). Subsystems allowing direct data access must (!)
+ * ensure that cb[] area can be written to when BPF program is
+ * invoked (otherwise cb[] save/restore is necessary).
+ */
+static inline void bpf_compute_data_pointers(struct sk_buff *skb)
 {
-  return __x;
+	struct bpf_skb_data_end *cb = (struct bpf_skb_data_end *)skb->cb;
+
+	BUILD_BUG_ON(sizeof(*cb) > FIELD_SIZEOF(struct sk_buff, cb));
+	cb->data_meta = skb->data - skb_metadata_len(skb);
+	cb->data_end  = skb->data + skb_headlen(skb);
 }
 
-static __inline __uint64_t
-__uint64_identity (__uint64_t __x)
+/* Similar to bpf_compute_data_pointers(), except that save orginal
+ * data in cb->data and cb->meta_data for restore.
+ */
+static inline void bpf_compute_and_save_data_end(
+	struct sk_buff *skb, void **saved_data_end)
 {
-  return __x;
+	struct bpf_skb_data_end *cb = (struct bpf_skb_data_end *)skb->cb;
+
+	*saved_data_end = cb->data_end;
+	cb->data_end  = skb->data + skb_headlen(skb);
 }
-# 62 "/usr/include/endian.h" 2 3 4
-# 195 "/usr/include/sys/types.h" 2 3 4
 
-
-# 1 "/usr/include/sys/select.h" 1 3 4
-# 30 "/usr/include/sys/select.h" 3 4
-# 1 "/usr/include/bits/select.h" 1 3 4
-# 22 "/usr/include/bits/select.h" 3 4
-# 1 "/usr/include/bits/wordsize.h" 1 3 4
-# 23 "/usr/include/bits/select.h" 2 3 4
-# 31 "/usr/include/sys/select.h" 2 3 4
-
-
-# 1 "/usr/include/bits/types/sigset_t.h" 1 3 4
-
-
-
-# 1 "/usr/include/bits/types/__sigset_t.h" 1 3 4
-
-
-
-
-typedef struct
+/* Restore data saved by bpf_compute_data_pointers(). */
+static inline void bpf_restore_data_end(
+	struct sk_buff *skb, void *saved_data_end)
 {
-  unsigned long int __val[(1024 / (8 * sizeof (unsigned long int)))];
-} __sigset_t;
-# 5 "/usr/include/bits/types/sigset_t.h" 2 3 4
+	struct bpf_skb_data_end *cb = (struct bpf_skb_data_end *)skb->cb;
 
+	cb->data_end = saved_data_end;
+}
 
-typedef __sigset_t sigset_t;
-# 34 "/usr/include/sys/select.h" 2 3 4
-
-
-
-# 1 "/usr/include/bits/types/struct_timeval.h" 1 3 4
-
-
-
-
-
-
-
-struct timeval
+static inline u8 *bpf_skb_cb(struct sk_buff *skb)
 {
-  __time_t tv_sec;
-  __suseconds_t tv_usec;
-};
-# 38 "/usr/include/sys/select.h" 2 3 4
+	/* eBPF programs may read/write skb->cb[] area to transfer meta
+	 * data between tail calls. Since this also needs to work with
+	 * tc, that scratch memory is mapped to qdisc_skb_cb's data area.
+	 *
+	 * In some socket filter cases, the cb unfortunately needs to be
+	 * saved/restored so that protocol specific skb->cb[] data won't
+	 * be lost. In any case, due to unpriviledged eBPF programs
+	 * attached to sockets, we need to clear the bpf_skb_cb() area
+	 * to not leak previous contents to user space.
+	 */
+	BUILD_BUG_ON(FIELD_SIZEOF(struct __sk_buff, cb) != BPF_SKB_CB_LEN);
+	BUILD_BUG_ON(FIELD_SIZEOF(struct __sk_buff, cb) !=
+		     FIELD_SIZEOF(struct qdisc_skb_cb, data));
 
-# 1 "/usr/include/bits/types/struct_timespec.h" 1 3 4
-# 9 "/usr/include/bits/types/struct_timespec.h" 3 4
-struct timespec
+	return qdisc_skb_cb(skb)->data;
+}
+
+static inline u32 __bpf_prog_run_save_cb(const struct bpf_prog *prog,
+					 struct sk_buff *skb)
 {
-  __time_t tv_sec;
-  __syscall_slong_t tv_nsec;
-};
-# 40 "/usr/include/sys/select.h" 2 3 4
+	u8 *cb_data = bpf_skb_cb(skb);
+	u8 cb_saved[BPF_SKB_CB_LEN];
+	u32 res;
 
+	if (unlikely(prog->cb_access)) {
+		memcpy(cb_saved, cb_data, sizeof(cb_saved));
+		memset(cb_data, 0, sizeof(cb_saved));
+	}
 
+	res = BPF_PROG_RUN(prog, skb);
 
-typedef __suseconds_t suseconds_t;
+	if (unlikely(prog->cb_access))
+		memcpy(cb_data, cb_saved, sizeof(cb_saved));
 
+	return res;
+}
 
-
-
-
-typedef long int __fd_mask;
-# 59 "/usr/include/sys/select.h" 3 4
-typedef struct
-  {
-
-
-
-
-
-
-    __fd_mask __fds_bits[1024 / (8 * (int) sizeof (__fd_mask))];
-
-
-  } fd_set;
-
-
-
-
-
-
-typedef __fd_mask fd_mask;
-# 91 "/usr/include/sys/select.h" 3 4
-
-# 101 "/usr/include/sys/select.h" 3 4
-extern int select (int __nfds, fd_set *__restrict __readfds,
-     fd_set *__restrict __writefds,
-     fd_set *__restrict __exceptfds,
-     struct timeval *__restrict __timeout);
-# 113 "/usr/include/sys/select.h" 3 4
-extern int pselect (int __nfds, fd_set *__restrict __readfds,
-      fd_set *__restrict __writefds,
-      fd_set *__restrict __exceptfds,
-      const struct timespec *__restrict __timeout,
-      const __sigset_t *__restrict __sigmask);
-# 126 "/usr/include/sys/select.h" 3 4
-
-# 198 "/usr/include/sys/types.h" 2 3 4
-
-
-
-
-
-
-
-# 1 "/usr/include/sys/sysmacros.h" 1 3 4
-# 41 "/usr/include/sys/sysmacros.h" 3 4
-# 1 "/usr/include/bits/sysmacros.h" 1 3 4
-# 42 "/usr/include/sys/sysmacros.h" 2 3 4
-# 71 "/usr/include/sys/sysmacros.h" 3 4
-
-
-extern unsigned int gnu_dev_major (__dev_t __dev) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__const__));
-extern unsigned int gnu_dev_minor (__dev_t __dev) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__const__));
-extern __dev_t gnu_dev_makedev (unsigned int __major, unsigned int __minor) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__const__));
-# 85 "/usr/include/sys/sysmacros.h" 3 4
-
-# 206 "/usr/include/sys/types.h" 2 3 4
-
-
-
-
-
-
-typedef __blksize_t blksize_t;
-
-
-
-
-
-
-typedef __blkcnt_t blkcnt_t;
-
-
-
-typedef __fsblkcnt_t fsblkcnt_t;
-
-
-
-typedef __fsfilcnt_t fsfilcnt_t;
-# 254 "/usr/include/sys/types.h" 3 4
-# 1 "/usr/include/bits/pthreadtypes.h" 1 3 4
-# 23 "/usr/include/bits/pthreadtypes.h" 3 4
-# 1 "/usr/include/bits/thread-shared-types.h" 1 3 4
-# 77 "/usr/include/bits/thread-shared-types.h" 3 4
-# 1 "/usr/include/bits/pthreadtypes-arch.h" 1 3 4
-# 21 "/usr/include/bits/pthreadtypes-arch.h" 3 4
-# 1 "/usr/include/bits/wordsize.h" 1 3 4
-# 22 "/usr/include/bits/pthreadtypes-arch.h" 2 3 4
-# 65 "/usr/include/bits/pthreadtypes-arch.h" 3 4
-struct __pthread_rwlock_arch_t
+static inline u32 bpf_prog_run_save_cb(const struct bpf_prog *prog,
+				       struct sk_buff *skb)
 {
-  unsigned int __readers;
-  unsigned int __writers;
-  unsigned int __wrphase_futex;
-  unsigned int __writers_futex;
-  unsigned int __pad3;
-  unsigned int __pad4;
+	u32 res;
 
-  int __cur_writer;
-  int __shared;
-  signed char __rwelision;
+	preempt_disable();
+	res = __bpf_prog_run_save_cb(prog, skb);
+	preempt_enable();
+	return res;
+}
 
-
-
-
-  unsigned char __pad1[7];
-
-
-  unsigned long int __pad2;
-
-
-  unsigned int __flags;
-# 99 "/usr/include/bits/pthreadtypes-arch.h" 3 4
-};
-# 78 "/usr/include/bits/thread-shared-types.h" 2 3 4
-
-
-
-
-typedef struct __pthread_internal_list
+static inline u32 bpf_prog_run_clear_cb(const struct bpf_prog *prog,
+					struct sk_buff *skb)
 {
-  struct __pthread_internal_list *__prev;
-  struct __pthread_internal_list *__next;
-} __pthread_list_t;
-# 118 "/usr/include/bits/thread-shared-types.h" 3 4
-struct __pthread_mutex_s
+	u8 *cb_data = bpf_skb_cb(skb);
+	u32 res;
+
+	if (unlikely(prog->cb_access))
+		memset(cb_data, 0, BPF_SKB_CB_LEN);
+
+	preempt_disable();
+	res = BPF_PROG_RUN(prog, skb);
+	preempt_enable();
+	return res;
+}
+
+static __always_inline u32 bpf_prog_run_xdp(const struct bpf_prog *prog,
+					    struct xdp_buff *xdp)
 {
-  int __lock ;
-  unsigned int __count;
-  int __owner;
+	/* Caller needs to hold rcu_read_lock() (!), otherwise program
+	 * can be released while still running, or map elements could be
+	 * freed early while still having concurrent users. XDP fastpath
+	 * already takes rcu_read_lock() when fetching the program, so
+	 * it's not necessary here anymore.
+	 */
+	return BPF_PROG_RUN(prog, xdp);
+}
 
-  unsigned int __nusers;
-
-
-
-  int __kind;
- 
-
-
-
-
-  short __spins; short __elision;
-  __pthread_list_t __list;
-# 145 "/usr/include/bits/thread-shared-types.h" 3 4
- 
-};
-
-
-
-
-struct __pthread_cond_s
+static inline u32 bpf_prog_insn_size(const struct bpf_prog *prog)
 {
-  __extension__ union
-  {
-    __extension__ unsigned long long int __wseq;
-    struct
-    {
-      unsigned int __low;
-      unsigned int __high;
-    } __wseq32;
-  };
-  __extension__ union
-  {
-    __extension__ unsigned long long int __g1_start;
-    struct
-    {
-      unsigned int __low;
-      unsigned int __high;
-    } __g1_start32;
-  };
-  unsigned int __g_refs[2] ;
-  unsigned int __g_size[2];
-  unsigned int __g1_orig_size;
-  unsigned int __wrefs;
-  unsigned int __g_signals[2];
-};
-# 24 "/usr/include/bits/pthreadtypes.h" 2 3 4
+	return prog->len * sizeof(struct bpf_insn);
+}
 
-
-
-typedef unsigned long int pthread_t;
-
-
-
-
-typedef union
+static inline u32 bpf_prog_tag_scratch_size(const struct bpf_prog *prog)
 {
-  char __size[4];
-  int __align;
-} pthread_mutexattr_t;
+	return round_up(bpf_prog_insn_size(prog) +
+			sizeof(__be64) + 1, SHA_MESSAGE_BYTES);
+}
 
-
-
-
-typedef union
+static inline unsigned int bpf_prog_size(unsigned int proglen)
 {
-  char __size[4];
-  int __align;
-} pthread_condattr_t;
+	return max(sizeof(struct bpf_prog),
+		   offsetof(struct bpf_prog, insns[proglen]));
+}
 
-
-
-typedef unsigned int pthread_key_t;
-
-
-
-typedef int pthread_once_t;
-
-
-union pthread_attr_t
+static inline bool bpf_prog_was_classic(const struct bpf_prog *prog)
 {
-  char __size[56];
-  long int __align;
-};
+	/* When classic BPF programs have been loaded and the arch
+	 * does not have a classic BPF JIT (anymore), they have been
+	 * converted via bpf_migrate_filter() to eBPF and thus always
+	 * have an unspec program type.
+	 */
+	return prog->type == BPF_PROG_TYPE_UNSPEC;
+}
 
-typedef union pthread_attr_t pthread_attr_t;
-
-
-
-
-typedef union
+static inline u32 bpf_ctx_off_adjust_machine(u32 size)
 {
-  struct __pthread_mutex_s __data;
-  char __size[40];
-  long int __align;
-} pthread_mutex_t;
+	const u32 size_machine = sizeof(unsigned long);
 
+	if (size > size_machine && size % size_machine == 0)
+		size = size_machine;
 
-typedef union
+	return size;
+}
+
+static inline bool
+bpf_ctx_narrow_access_ok(u32 off, u32 size, u32 size_default)
 {
-  struct __pthread_cond_s __data;
-  char __size[48];
-  __extension__ long long int __align;
-} pthread_cond_t;
+	return size <= size_default && (size & (size - 1)) == 0;
+}
 
-
-
-
-
-typedef union
+static inline u8
+bpf_ctx_narrow_load_shift(u32 off, u32 size, u32 size_default)
 {
-  struct __pthread_rwlock_arch_t __data;
-  char __size[56];
-  long int __align;
-} pthread_rwlock_t;
+	u8 load_off = off & (size_default - 1);
 
-typedef union
+#ifdef __LITTLE_ENDIAN
+	return load_off * 8;
+#else
+	return (size_default - (load_off + size)) * 8;
+#endif
+}
+
+#define bpf_ctx_wide_access_ok(off, size, type, field)			  	(size == sizeof(__u64) &&					  	off >= offsetof(type, field) &&					  	off + sizeof(__u64) <= offsetofend(type, field) &&		  	off % sizeof(__u64) == 0)
+
+#define bpf_classic_proglen(fprog) (fprog->len * sizeof(fprog->filter[0]))
+
+static inline void bpf_prog_lock_ro(struct bpf_prog *fp)
 {
-  char __size[8];
-  long int __align;
-} pthread_rwlockattr_t;
+	set_vm_flush_reset_perms(fp);
+	set_memory_ro((unsigned long)fp, fp->pages);
+}
 
-
-
-
-
-typedef volatile int pthread_spinlock_t;
-
-
-
-
-typedef union
+static inline void bpf_jit_binary_lock_ro(struct bpf_binary_header *hdr)
 {
-  char __size[32];
-  long int __align;
-} pthread_barrier_t;
+	set_vm_flush_reset_perms(hdr);
+	set_memory_ro((unsigned long)hdr, hdr->pages);
+	set_memory_x((unsigned long)hdr, hdr->pages);
+}
 
-typedef union
+static inline struct bpf_binary_header *
+bpf_jit_binary_hdr(const struct bpf_prog *fp)
 {
-  char __size[4];
-  int __align;
-} pthread_barrierattr_t;
-# 255 "/usr/include/sys/types.h" 2 3 4
+	unsigned long real_start = (unsigned long)fp->bpf_func;
+	unsigned long addr = real_start & PAGE_MASK;
 
+	return (void *)addr;
+}
 
-
-# 395 "/usr/include/stdlib.h" 2 3 4
-
-
-
-
-
-
-extern long int random (void) __attribute__ ((__nothrow__ , __leaf__));
-
-
-extern void srandom (unsigned int __seed) __attribute__ ((__nothrow__ , __leaf__));
-
-
-
-
-
-extern char *initstate (unsigned int __seed, char *__statebuf,
-   size_t __statelen) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (2)));
-
-
-
-extern char *setstate (char *__statebuf) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-
-
-
-
-
-
-
-struct random_data
-  {
-    int32_t *fptr;
-    int32_t *rptr;
-    int32_t *state;
-    int rand_type;
-    int rand_deg;
-    int rand_sep;
-    int32_t *end_ptr;
-  };
-
-extern int random_r (struct random_data *__restrict __buf,
-       int32_t *__restrict __result) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1, 2)));
-
-extern int srandom_r (unsigned int __seed, struct random_data *__buf)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (2)));
-
-extern int initstate_r (unsigned int __seed, char *__restrict __statebuf,
-   size_t __statelen,
-   struct random_data *__restrict __buf)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (2, 4)));
-
-extern int setstate_r (char *__restrict __statebuf,
-         struct random_data *__restrict __buf)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1, 2)));
-
-
-
-
-
-extern int rand (void) __attribute__ ((__nothrow__ , __leaf__));
-
-extern void srand (unsigned int __seed) __attribute__ ((__nothrow__ , __leaf__));
-
-
-
-extern int rand_r (unsigned int *__seed) __attribute__ ((__nothrow__ , __leaf__));
-
-
-
-
-
-
-
-extern double drand48 (void) __attribute__ ((__nothrow__ , __leaf__));
-extern double erand48 (unsigned short int __xsubi[3]) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-
-
-extern long int lrand48 (void) __attribute__ ((__nothrow__ , __leaf__));
-extern long int nrand48 (unsigned short int __xsubi[3])
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-
-
-extern long int mrand48 (void) __attribute__ ((__nothrow__ , __leaf__));
-extern long int jrand48 (unsigned short int __xsubi[3])
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-
-
-extern void srand48 (long int __seedval) __attribute__ ((__nothrow__ , __leaf__));
-extern unsigned short int *seed48 (unsigned short int __seed16v[3])
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-extern void lcong48 (unsigned short int __param[7]) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-
-
-
-
-
-struct drand48_data
-  {
-    unsigned short int __x[3];
-    unsigned short int __old_x[3];
-    unsigned short int __c;
-    unsigned short int __init;
-    __extension__ unsigned long long int __a;
-
-  };
-
-
-extern int drand48_r (struct drand48_data *__restrict __buffer,
-        double *__restrict __result) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1, 2)));
-extern int erand48_r (unsigned short int __xsubi[3],
-        struct drand48_data *__restrict __buffer,
-        double *__restrict __result) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1, 2)));
-
-
-extern int lrand48_r (struct drand48_data *__restrict __buffer,
-        long int *__restrict __result)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1, 2)));
-extern int nrand48_r (unsigned short int __xsubi[3],
-        struct drand48_data *__restrict __buffer,
-        long int *__restrict __result)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1, 2)));
-
-
-extern int mrand48_r (struct drand48_data *__restrict __buffer,
-        long int *__restrict __result)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1, 2)));
-extern int jrand48_r (unsigned short int __xsubi[3],
-        struct drand48_data *__restrict __buffer,
-        long int *__restrict __result)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1, 2)));
-
-
-extern int srand48_r (long int __seedval, struct drand48_data *__buffer)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (2)));
-
-extern int seed48_r (unsigned short int __seed16v[3],
-       struct drand48_data *__buffer) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1, 2)));
-
-extern int lcong48_r (unsigned short int __param[7],
-        struct drand48_data *__buffer)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1, 2)));
-
-
-
-
-extern void *malloc (size_t __size) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__malloc__)) ;
-
-extern void *calloc (size_t __nmemb, size_t __size)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__malloc__)) ;
-
-
-
-
-
-
-extern void *realloc (void *__ptr, size_t __size)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__warn_unused_result__));
-# 563 "/usr/include/stdlib.h" 3 4
-extern void free (void *__ptr) __attribute__ ((__nothrow__ , __leaf__));
-
-
-# 1 "/usr/include/alloca.h" 1 3 4
-# 24 "/usr/include/alloca.h" 3 4
-# 1 "/usr/lib/gcc/x86_64-redhat-linux/8/include/stddef.h" 1 3 4
-# 25 "/usr/include/alloca.h" 2 3 4
-
-
-
-
-
-
-
-extern void *alloca (size_t __size) __attribute__ ((__nothrow__ , __leaf__));
-
-
-
-
-
-
-# 567 "/usr/include/stdlib.h" 2 3 4
-
-
-
-
-
-extern void *valloc (size_t __size) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__malloc__)) ;
-
-
-
-
-extern int posix_memalign (void **__memptr, size_t __alignment, size_t __size)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1))) ;
-
-
-
-
-extern void *aligned_alloc (size_t __alignment, size_t __size)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__malloc__)) __attribute__ ((__alloc_size__ (2))) ;
-
-
-
-extern void abort (void) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__noreturn__));
-
-
-
-extern int atexit (void (*__func) (void)) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-
-
-
-
-
-
-
-extern int at_quick_exit (void (*__func) (void)) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-
-
-
-
-
-
-extern int on_exit (void (*__func) (int __status, void *__arg), void *__arg)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-
-
-
-
-
-extern void exit (int __status) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__noreturn__));
-
-
-
-
-
-extern void quick_exit (int __status) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__noreturn__));
-
-
-
-
-
-extern void _Exit (int __status) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__noreturn__));
-
-
-
-
-extern char *getenv (const char *__name) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1))) ;
-# 644 "/usr/include/stdlib.h" 3 4
-extern int putenv (char *__string) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-
-
-
-
-
-extern int setenv (const char *__name, const char *__value, int __replace)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (2)));
-
-
-extern int unsetenv (const char *__name) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-
-
-
-
-
-
-extern int clearenv (void) __attribute__ ((__nothrow__ , __leaf__));
-# 672 "/usr/include/stdlib.h" 3 4
-extern char *mktemp (char *__template) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-# 685 "/usr/include/stdlib.h" 3 4
-extern int mkstemp (char *__template) __attribute__ ((__nonnull__ (1))) ;
-# 707 "/usr/include/stdlib.h" 3 4
-extern int mkstemps (char *__template, int __suffixlen) __attribute__ ((__nonnull__ (1))) ;
-# 728 "/usr/include/stdlib.h" 3 4
-extern char *mkdtemp (char *__template) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1))) ;
-# 781 "/usr/include/stdlib.h" 3 4
-extern int system (const char *__command) ;
-# 797 "/usr/include/stdlib.h" 3 4
-extern char *realpath (const char *__restrict __name,
-         char *__restrict __resolved) __attribute__ ((__nothrow__ , __leaf__)) ;
-
-
-
-
-
-
-typedef int (*__compar_fn_t) (const void *, const void *);
-# 817 "/usr/include/stdlib.h" 3 4
-extern void *bsearch (const void *__key, const void *__base,
-        size_t __nmemb, size_t __size, __compar_fn_t __compar)
-     __attribute__ ((__nonnull__ (1, 2, 5))) ;
-
-
-
-
-
-
-
-extern void qsort (void *__base, size_t __nmemb, size_t __size,
-     __compar_fn_t __compar) __attribute__ ((__nonnull__ (1, 4)));
-# 837 "/usr/include/stdlib.h" 3 4
-extern int abs (int __x) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__const__)) ;
-extern long int labs (long int __x) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__const__)) ;
-
-
-__extension__ extern long long int llabs (long long int __x)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__const__)) ;
-
-
-
-
-
-
-extern div_t div (int __numer, int __denom)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__const__)) ;
-extern ldiv_t ldiv (long int __numer, long int __denom)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__const__)) ;
-
-
-__extension__ extern lldiv_t lldiv (long long int __numer,
-        long long int __denom)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__const__)) ;
-# 869 "/usr/include/stdlib.h" 3 4
-extern char *ecvt (double __value, int __ndigit, int *__restrict __decpt,
-     int *__restrict __sign) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (3, 4))) ;
-
-
-
-
-extern char *fcvt (double __value, int __ndigit, int *__restrict __decpt,
-     int *__restrict __sign) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (3, 4))) ;
-
-
-
-
-extern char *gcvt (double __value, int __ndigit, char *__buf)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (3))) ;
-
-
-
-
-extern char *qecvt (long double __value, int __ndigit,
-      int *__restrict __decpt, int *__restrict __sign)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (3, 4))) ;
-extern char *qfcvt (long double __value, int __ndigit,
-      int *__restrict __decpt, int *__restrict __sign)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (3, 4))) ;
-extern char *qgcvt (long double __value, int __ndigit, char *__buf)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (3))) ;
-
-
-
-
-extern int ecvt_r (double __value, int __ndigit, int *__restrict __decpt,
-     int *__restrict __sign, char *__restrict __buf,
-     size_t __len) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (3, 4, 5)));
-extern int fcvt_r (double __value, int __ndigit, int *__restrict __decpt,
-     int *__restrict __sign, char *__restrict __buf,
-     size_t __len) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (3, 4, 5)));
-
-extern int qecvt_r (long double __value, int __ndigit,
-      int *__restrict __decpt, int *__restrict __sign,
-      char *__restrict __buf, size_t __len)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (3, 4, 5)));
-extern int qfcvt_r (long double __value, int __ndigit,
-      int *__restrict __decpt, int *__restrict __sign,
-      char *__restrict __buf, size_t __len)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (3, 4, 5)));
-
-
-
-
-
-extern int mblen (const char *__s, size_t __n) __attribute__ ((__nothrow__ , __leaf__));
-
-
-extern int mbtowc (wchar_t *__restrict __pwc,
-     const char *__restrict __s, size_t __n) __attribute__ ((__nothrow__ , __leaf__));
-
-
-extern int wctomb (char *__s, wchar_t __wchar) __attribute__ ((__nothrow__ , __leaf__));
-
-
-
-extern size_t mbstowcs (wchar_t *__restrict __pwcs,
-   const char *__restrict __s, size_t __n) __attribute__ ((__nothrow__ , __leaf__));
-
-extern size_t wcstombs (char *__restrict __s,
-   const wchar_t *__restrict __pwcs, size_t __n)
-     __attribute__ ((__nothrow__ , __leaf__));
-
-
-
-
-
-
-
-extern int rpmatch (const char *__response) __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1))) ;
-# 954 "/usr/include/stdlib.h" 3 4
-extern int getsubopt (char **__restrict __optionp,
-        char *const *__restrict __tokens,
-        char **__restrict __valuep)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1, 2, 3))) ;
-# 1000 "/usr/include/stdlib.h" 3 4
-extern int getloadavg (double __loadavg[], int __nelem)
-     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (1)));
-# 1010 "/usr/include/stdlib.h" 3 4
-# 1 "/usr/include/bits/stdlib-float.h" 1 3 4
-# 1011 "/usr/include/stdlib.h" 2 3 4
-# 1020 "/usr/include/stdlib.h" 3 4
-
-# 26 "delblank.c" 2
-# 1 "/usr/include/getopt.h" 1 3 4
-# 35 "/usr/include/getopt.h" 3 4
-# 1 "/usr/include/bits/getopt_core.h" 1 3 4
-# 28 "/usr/include/bits/getopt_core.h" 3 4
-
-
-
-
-
-
-
-
-extern char *optarg;
-# 50 "/usr/include/bits/getopt_core.h" 3 4
-extern int optind;
-
-
-
-
-extern int opterr;
-
-
-
-extern int optopt;
-# 91 "/usr/include/bits/getopt_core.h" 3 4
-extern int getopt (int ___argc, char *const *___argv, const char *__shortopts)
-       __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (2, 3)));
-
-
-# 36 "/usr/include/getopt.h" 2 3 4
-# 1 "/usr/include/bits/getopt_ext.h" 1 3 4
-# 27 "/usr/include/bits/getopt_ext.h" 3 4
-
-# 50 "/usr/include/bits/getopt_ext.h" 3 4
-struct option
+int sk_filter_trim_cap(struct sock *sk, struct sk_buff *skb, unsigned int cap);
+static inline int sk_filter(struct sock *sk, struct sk_buff *skb)
 {
-  const char *name;
+	return sk_filter_trim_cap(sk, skb, 1);
+}
 
+struct bpf_prog *bpf_prog_select_runtime(struct bpf_prog *fp, int *err);
+void bpf_prog_free(struct bpf_prog *fp);
 
-  int has_arg;
-  int *flag;
-  int val;
+bool bpf_opcode_in_insntable(u8 code);
+
+void bpf_prog_free_linfo(struct bpf_prog *prog);
+void bpf_prog_fill_jited_linfo(struct bpf_prog *prog,
+			       const u32 *insn_to_jit_off);
+int bpf_prog_alloc_jited_linfo(struct bpf_prog *prog);
+void bpf_prog_free_jited_linfo(struct bpf_prog *prog);
+void bpf_prog_free_unused_jited_linfo(struct bpf_prog *prog);
+
+struct bpf_prog *bpf_prog_alloc(unsigned int size, gfp_t gfp_extra_flags);
+struct bpf_prog *bpf_prog_alloc_no_stats(unsigned int size, gfp_t gfp_extra_flags);
+struct bpf_prog *bpf_prog_realloc(struct bpf_prog *fp_old, unsigned int size,
+				  gfp_t gfp_extra_flags);
+void __bpf_prog_free(struct bpf_prog *fp);
+
+static inline void bpf_prog_unlock_free(struct bpf_prog *fp)
+{
+	__bpf_prog_free(fp);
+}
+
+typedef int (*bpf_aux_classic_check_t)(struct sock_filter *filter,
+				       unsigned int flen);
+
+int bpf_prog_create(struct bpf_prog **pfp, struct sock_fprog_kern *fprog);
+int bpf_prog_create_from_user(struct bpf_prog **pfp, struct sock_fprog *fprog,
+			      bpf_aux_classic_check_t trans, bool save_orig);
+void bpf_prog_destroy(struct bpf_prog *fp);
+
+int sk_attach_filter(struct sock_fprog *fprog, struct sock *sk);
+int sk_attach_bpf(u32 ufd, struct sock *sk);
+int sk_reuseport_attach_filter(struct sock_fprog *fprog, struct sock *sk);
+int sk_reuseport_attach_bpf(u32 ufd, struct sock *sk);
+void sk_reuseport_prog_free(struct bpf_prog *prog);
+int sk_detach_filter(struct sock *sk);
+int sk_get_filter(struct sock *sk, struct sock_filter __user *filter,
+		  unsigned int len);
+
+bool sk_filter_charge(struct sock *sk, struct sk_filter *fp);
+void sk_filter_uncharge(struct sock *sk, struct sk_filter *fp);
+
+u64 __bpf_call_base(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5);
+#define __bpf_call_base_args   	((u64 (*)(u64, u64, u64, u64, u64, const struct bpf_insn *))   	 __bpf_call_base)
+
+struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog);
+void bpf_jit_compile(struct bpf_prog *prog);
+bool bpf_jit_needs_zext(void);
+bool bpf_helper_changes_pkt_data(void *func);
+
+static inline bool bpf_dump_raw_ok(void)
+{
+	/* Reconstruction of call-sites is dependent on kallsyms,
+	 * thus make dump the same restriction.
+	 */
+	return kallsyms_show_value() == 1;
+}
+
+struct bpf_prog *bpf_patch_insn_single(struct bpf_prog *prog, u32 off,
+				       const struct bpf_insn *patch, u32 len);
+int bpf_remove_insns(struct bpf_prog *prog, u32 off, u32 cnt);
+
+void bpf_clear_redirect_map(struct bpf_map *map);
+
+static inline bool xdp_return_frame_no_direct(void)
+{
+	struct bpf_redirect_info *ri = this_cpu_ptr(&bpf_redirect_info);
+
+	return ri->kern_flags & BPF_RI_F_RF_NO_DIRECT;
+}
+
+static inline void xdp_set_return_frame_no_direct(void)
+{
+	struct bpf_redirect_info *ri = this_cpu_ptr(&bpf_redirect_info);
+
+	ri->kern_flags |= BPF_RI_F_RF_NO_DIRECT;
+}
+
+static inline void xdp_clear_return_frame_no_direct(void)
+{
+	struct bpf_redirect_info *ri = this_cpu_ptr(&bpf_redirect_info);
+
+	ri->kern_flags &= ~BPF_RI_F_RF_NO_DIRECT;
+}
+
+static inline int xdp_ok_fwd_dev(const struct net_device *fwd,
+				 unsigned int pktlen)
+{
+	unsigned int len;
+
+	if (unlikely(!(fwd->flags & IFF_UP)))
+		return -ENETDOWN;
+
+	len = fwd->mtu + fwd->hard_header_len + VLAN_HLEN;
+	if (pktlen > len)
+		return -EMSGSIZE;
+
+	return 0;
+}
+
+/* The pair of xdp_do_redirect and xdp_do_flush_map MUST be called in the
+ * same cpu context. Further for best results no more than a single map
+ * for the do_redirect/do_flush pair should be used. This limitation is
+ * because we only track one map and force a flush when the map changes.
+ * This does not appear to be a real limitation for existing software.
+ */
+int xdp_do_generic_redirect(struct net_device *dev, struct sk_buff *skb,
+			    struct xdp_buff *xdp, struct bpf_prog *prog);
+int xdp_do_redirect(struct net_device *dev,
+		    struct xdp_buff *xdp,
+		    struct bpf_prog *prog);
+void xdp_do_flush_map(void);
+
+void bpf_warn_invalid_xdp_action(u32 act);
+
+#ifdef CONFIG_INET
+struct sock *bpf_run_sk_reuseport(struct sock_reuseport *reuse, struct sock *sk,
+				  struct bpf_prog *prog, struct sk_buff *skb,
+				  u32 hash);
+#else
+static inline struct sock *
+bpf_run_sk_reuseport(struct sock_reuseport *reuse, struct sock *sk,
+		     struct bpf_prog *prog, struct sk_buff *skb,
+		     u32 hash)
+{
+	return NULL;
+}
+#endif
+
+#ifdef CONFIG_BPF_JIT
+extern int bpf_jit_enable;
+extern int bpf_jit_harden;
+extern int bpf_jit_kallsyms;
+extern long bpf_jit_limit;
+
+typedef void (*bpf_jit_fill_hole_t)(void *area, unsigned int size);
+
+struct bpf_binary_header *
+bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
+		     unsigned int alignment,
+		     bpf_jit_fill_hole_t bpf_fill_ill_insns);
+void bpf_jit_binary_free(struct bpf_binary_header *hdr);
+u64 bpf_jit_alloc_exec_limit(void);
+void *bpf_jit_alloc_exec(unsigned long size);
+void bpf_jit_free_exec(void *addr);
+void bpf_jit_free(struct bpf_prog *fp);
+
+int bpf_jit_get_func_addr(const struct bpf_prog *prog,
+			  const struct bpf_insn *insn, bool extra_pass,
+			  u64 *func_addr, bool *func_addr_fixed);
+
+struct bpf_prog *bpf_jit_blind_constants(struct bpf_prog *fp);
+void bpf_jit_prog_release_other(struct bpf_prog *fp, struct bpf_prog *fp_other);
+
+static inline void bpf_jit_dump(unsigned int flen, unsigned int proglen,
+				u32 pass, void *image)
+{
+	pr_err("flen=%u proglen=%u pass=%u image=%pK from=%s pid=%d\n", flen,
+	       proglen, pass, image, current->comm, task_pid_nr(current));
+
+	if (image)
+		print_hex_dump(KERN_ERR, "JIT code: ", DUMP_PREFIX_OFFSET,
+			       16, 1, image, proglen, false);
+}
+
+static inline bool bpf_jit_is_ebpf(void)
+{
+# ifdef CONFIG_HAVE_EBPF_JIT
+	return true;
+# else
+	return false;
+# endif
+}
+
+static inline bool ebpf_jit_enabled(void)
+{
+	return bpf_jit_enable && bpf_jit_is_ebpf();
+}
+
+static inline bool bpf_prog_ebpf_jited(const struct bpf_prog *fp)
+{
+	return fp->jited && bpf_jit_is_ebpf();
+}
+
+static inline bool bpf_jit_blinding_enabled(struct bpf_prog *prog)
+{
+	/* These are the prerequisites, should someone ever have the
+	 * idea to call blinding outside of them, we make sure to
+	 * bail out.
+	 */
+	if (!bpf_jit_is_ebpf())
+		return false;
+	if (!prog->jit_requested)
+		return false;
+	if (!bpf_jit_harden)
+		return false;
+	if (bpf_jit_harden == 1 && capable(CAP_SYS_ADMIN))
+		return false;
+
+	return true;
+}
+
+static inline bool bpf_jit_kallsyms_enabled(void)
+{
+	/* There are a couple of corner cases where kallsyms should
+	 * not be enabled f.e. on hardening.
+	 */
+	if (bpf_jit_harden)
+		return false;
+	if (!bpf_jit_kallsyms)
+		return false;
+	if (bpf_jit_kallsyms == 1)
+		return true;
+
+	return false;
+}
+
+const char *__bpf_address_lookup(unsigned long addr, unsigned long *size,
+				 unsigned long *off, char *sym);
+bool is_bpf_text_address(unsigned long addr);
+int bpf_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
+		    char *sym);
+
+static inline const char *
+bpf_address_lookup(unsigned long addr, unsigned long *size,
+		   unsigned long *off, char **modname, char *sym)
+{
+	const char *ret = __bpf_address_lookup(addr, size, off, sym);
+
+	if (ret && modname)
+		*modname = NULL;
+	return ret;
+}
+
+void bpf_prog_kallsyms_add(struct bpf_prog *fp);
+void bpf_prog_kallsyms_del(struct bpf_prog *fp);
+void bpf_get_prog_name(const struct bpf_prog *prog, char *sym);
+
+#else /* CONFIG_BPF_JIT */
+
+static inline bool ebpf_jit_enabled(void)
+{
+	return false;
+}
+
+static inline bool bpf_prog_ebpf_jited(const struct bpf_prog *fp)
+{
+	return false;
+}
+
+static inline void bpf_jit_free(struct bpf_prog *fp)
+{
+	bpf_prog_unlock_free(fp);
+}
+
+static inline bool bpf_jit_kallsyms_enabled(void)
+{
+	return false;
+}
+
+static inline const char *
+__bpf_address_lookup(unsigned long addr, unsigned long *size,
+		     unsigned long *off, char *sym)
+{
+	return NULL;
+}
+
+static inline bool is_bpf_text_address(unsigned long addr)
+{
+	return false;
+}
+
+static inline int bpf_get_kallsym(unsigned int symnum, unsigned long *value,
+				  char *type, char *sym)
+{
+	return -ERANGE;
+}
+
+static inline const char *
+bpf_address_lookup(unsigned long addr, unsigned long *size,
+		   unsigned long *off, char **modname, char *sym)
+{
+	return NULL;
+}
+
+static inline void bpf_prog_kallsyms_add(struct bpf_prog *fp)
+{
+}
+
+static inline void bpf_prog_kallsyms_del(struct bpf_prog *fp)
+{
+}
+
+static inline void bpf_get_prog_name(const struct bpf_prog *prog, char *sym)
+{
+	sym[0] = '\0';
+}
+
+#endif /* CONFIG_BPF_JIT */
+
+void bpf_prog_kallsyms_del_subprogs(struct bpf_prog *fp);
+void bpf_prog_kallsyms_del_all(struct bpf_prog *fp);
+
+#define BPF_ANC		BIT(15)
+
+static inline bool bpf_needs_clear_a(const struct sock_filter *first)
+{
+	switch (first->code) {
+	case BPF_RET | BPF_K:
+	case BPF_LD | BPF_W | BPF_LEN:
+		return false;
+
+	case BPF_LD | BPF_W | BPF_ABS:
+	case BPF_LD | BPF_H | BPF_ABS:
+	case BPF_LD | BPF_B | BPF_ABS:
+		if (first->k == SKF_AD_OFF + SKF_AD_ALU_XOR_X)
+			return true;
+		return false;
+
+	default:
+		return true;
+	}
+}
+
+static inline u16 bpf_anc_helper(const struct sock_filter *ftest)
+{
+	BUG_ON(ftest->code & BPF_ANC);
+
+	switch (ftest->code) {
+	case BPF_LD | BPF_W | BPF_ABS:
+	case BPF_LD | BPF_H | BPF_ABS:
+	case BPF_LD | BPF_B | BPF_ABS:
+#define BPF_ANCILLARY(CODE)	case SKF_AD_OFF + SKF_AD_##CODE:	  				return BPF_ANC | SKF_AD_##CODE
+		switch (ftest->k) {
+		BPF_ANCILLARY(PROTOCOL);
+		BPF_ANCILLARY(PKTTYPE);
+		BPF_ANCILLARY(IFINDEX);
+		BPF_ANCILLARY(NLATTR);
+		BPF_ANCILLARY(NLATTR_NEST);
+		BPF_ANCILLARY(MARK);
+		BPF_ANCILLARY(QUEUE);
+		BPF_ANCILLARY(HATYPE);
+		BPF_ANCILLARY(RXHASH);
+		BPF_ANCILLARY(CPU);
+		BPF_ANCILLARY(ALU_XOR_X);
+		BPF_ANCILLARY(VLAN_TAG);
+		BPF_ANCILLARY(VLAN_TAG_PRESENT);
+		BPF_ANCILLARY(PAY_OFFSET);
+		BPF_ANCILLARY(RANDOM);
+		BPF_ANCILLARY(VLAN_TPID);
+		}
+		/* Fallthrough. */
+	default:
+		return ftest->code;
+	}
+}
+
+void *bpf_internal_load_pointer_neg_helper(const struct sk_buff *skb,
+					   int k, unsigned int size);
+
+static inline void *bpf_load_pointer(const struct sk_buff *skb, int k,
+				     unsigned int size, void *buffer)
+{
+	if (k >= 0)
+		return skb_header_pointer(skb, k, size, buffer);
+
+	return bpf_internal_load_pointer_neg_helper(skb, k, size);
+}
+
+static inline int bpf_tell_extensions(void)
+{
+	return SKF_AD_MAX;
+}
+
+struct bpf_sock_addr_kern {
+	struct sock *sk;
+	struct sockaddr *uaddr;
+	/* Temporary "register" to make indirect stores to nested structures
+	 * defined above. We need three registers to make such a store, but
+	 * only two (src and dst) are available at convert_ctx_access time
+	 */
+	u64 tmp_reg;
+	void *t_ctx;	/* Attach type specific context. */
 };
 
+struct bpf_sock_ops_kern {
+	struct	sock *sk;
+	u32	op;
+	union {
+		u32 args[4];
+		u32 reply;
+		u32 replylong[4];
+	};
+	u32	is_fullsock;
+	u64	temp;			/* temp and everything after is not
+					 * initialized to 0 before calling
+					 * the BPF program. New fields that
+					 * should be initialized to 0 should
+					 * be inserted before temp.
+					 * temp is scratch storage used by
+					 * sock_ops_convert_ctx_access
+					 * as temporary storage of a register.
+					 */
+};
 
+struct bpf_sysctl_kern {
+	struct ctl_table_header *head;
+	struct ctl_table *table;
+	void *cur_val;
+	size_t cur_len;
+	void *new_val;
+	size_t new_len;
+	int new_updated;
+	int write;
+	loff_t *ppos;
+	/* Temporary "register" for indirect stores to ppos. */
+	u64 tmp_reg;
+};
 
+struct bpf_sockopt_kern {
+	struct sock	*sk;
+	u8		*optval;
+	u8		*optval_end;
+	s32		level;
+	s32		optname;
+	s32		optlen;
+	s32		retval;
+};
 
-
-
-
-extern int getopt_long (int ___argc, char *const *___argv,
-   const char *__shortopts,
-          const struct option *__longopts, int *__longind)
-       __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (2, 3)));
-extern int getopt_long_only (int ___argc, char *const *___argv,
-        const char *__shortopts,
-               const struct option *__longopts, int *__longind)
-       __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__nonnull__ (2, 3)));
-
-
-# 37 "/usr/include/getopt.h" 2 3 4
-# 27 "delblank.c" 2
-
-# 27 "delblank.c"
-int main(int argc, char **argv) { int c; int digit_optind = 0;
-    while (1) { int this_option_optind = optind ? optind : 1; int option_index = 0;
-        static struct option long_options[] = {
-            {"add", 
-# 30 "delblank.c" 3 4
-                       1
-# 30 "delblank.c"
-                                        , 0, 0 }, {"append", 
-# 30 "delblank.c" 3 4
-                                                               0
-# 30 "delblank.c"
-                                                                          , 0, 0 }, {"delete", 
-# 30 "delblank.c" 3 4
-                                                                                                       1
-# 30 "delblank.c"
-                                                                                                                        , 0, 0 },
-            {"verbose", 
-# 31 "delblank.c" 3 4
-                       0
-# 31 "delblank.c"
-                                  , 0, 0 }, {"create", 
-# 31 "delblank.c" 3 4
-                                                               1
-# 31 "delblank.c"
-                                                                                , 0, 'f'}, {"file", 
-# 31 "delblank.c" 3 4
-                                                                                                       1
-# 31 "delblank.c"
-                                                                                                                        , 0, 0 }, {0, 0, 0, 0 } };
-        c = getopt_long(argc, argv, "abc:d:012", long_options, &option_index); if (c == -1) break;
-        switch (c) {
-        case 0: printf("option %s", long_options[option_index].name);
-            if (optarg) printf(" with arg %s", optarg); printf("\n"); break;
-        case '0': case '1': case '2':
-            if (digit_optind != 0 && digit_optind != this_option_optind) printf("digits occur in two different argv-elements.\n");
-            digit_optind = this_option_optind; printf("option %c\n", c); break;
-        case 'a': printf("option a\n"); break;
-        case 'b': printf("option b\n"); break;
-        case 'c': printf("option c with value '%s'\n", optarg); break;
-        case 'd': printf("option d with value '%s'\n", optarg); break;
-        case '?': break; default: printf("?? getopt returned character code 0%o ??\n", c); } }
-    if (optind < argc) { printf("non-option ARGV-elements: ");
-        while (optind < argc) printf("%s ", argv[optind++]); printf("\n"); }
-    exit(
-# 46 "delblank.c" 3 4
-        0
-# 46 "delblank.c"
-                    ); }
+#endif /* __LINUX_FILTER_H__ */

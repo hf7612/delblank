@@ -78,7 +78,6 @@ int main(int argc, char **argv) { int c; int digit_optind = 0; //deB
         case 'f': /*printf("option f with value '%s'\n", optarg); */  trimKmsg(optarg);   break; case '?': break; default: printf("?? getopt returned character code 0%o ??\n", c); } } 
     if (optind < argc) { // printf("non-option ARGV-elements: "); 
         while (optind < argc) { //deB//printf(" f:%s ", argv[optind]);
-            trimKmsg(argv[optind++]); //deB
-            // printf(" v:%s ", argv[optind++]);
+            trimKmsg(argv[optind++]); //deB // printf(" v:%s ", argv[optind++]);
         } printf("\n"); } 
     exit(EXIT_SUCCESS); }
