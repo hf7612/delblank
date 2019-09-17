@@ -1,12 +1,12 @@
-# shrinkconcatnate:shrinkconcatnate.c
+# uncommentblock:uncommentblock.c
 # 	gcc -g $^ -o $@
 
-# all:shrinkconcatnate
+# all:uncommentblock
 
 # %.o:%.c
 # 	gcc -g $^ -o $@
 
-# objects = shrinkconcatnate  
+# objects = uncommentblock  
 # all: $(objects) 
 # $(objects): %.o: %.c
 # 	echo $@
@@ -18,7 +18,7 @@ CFLAGS = -std=c99 -W -Wall # -g
 CFLAGSS = -std=c99 -W # -g
 LIBS = -lm
 
-shrinkconcatnate : shrinkconcatnate.o  
+uncommentblock : uncommentblock.o  
 	$(CC) $^ $(LIBS) -o $@  # -lcrypt -lssl -lcrypto # -g
 
 %.o : %.c
