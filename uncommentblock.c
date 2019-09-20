@@ -135,23 +135,24 @@ static int trimBlockComment(char *s, int *lenI, int *chg) { int len = *lenI; int
     char *t = 0;//g ets(s);
     char *t2 = 0; int ind0=0,ind1=0,ind2=0,ind3=0;
     char *sR = s;
-    while( ((sR-s)>=0) && (t = strchr(sR, '/')) ){
-        sR = sR+1;
+    while(t = strchr(sR, '/')){ //printf(" %d ", t-s);
+        sR = t+1;
         if(t[1]=='*'){ // find first /* // ind0 = ;
+            sR = t+2;
             char *sR2 = t+1;
             while( (t2 = strchr(sR2, '*')) ){
                  sR2 = sR2+1;
-                if(t2[1]=='/'){ // find first */ // fwrite("\n\n\n", 1, 3, stdout); fwrite(t, 1, 10, stdout);
+                if(t2[1]=='/'){  // find first */ // fwrite("\n\n\n", 1, 3, stdout); fwrite(t, 1, 10, stdout);
+                    sR = t2+2;
                     tranRet2Nullb(t+2, t2-t-2, chg);
                     for(int i=t-s-1; i>0; i--){//trim prefix \n,\t,\b...
                         if(isspace(s[i])){//s[i]=='\n'||s[i]=='\t' || ){
                             if(s[i] != ' '){
                                 s[i] = ' ';
                                 *chg = 1;}
-                        }else break;
-                    }
-                    sR = t2+1; break;
-                } } } } }
+                        }else break; }
+                    break; } } } } }
+char *gS = 0;
 static int trimLargeBlock(char *f){ struct stat statbuf; //deB
     if(!f && !f[0]) return -1;// const char pathname[256];
     if(!stat(f, &statbuf)){ //printf(" size:%d ", statbuf.st_size);// lstat(f, &statbuf); printf(" size:%d ", statbuf.st_size);
@@ -159,15 +160,15 @@ static int trimLargeBlock(char *f){ struct stat statbuf; //deB
         if(fSz > 0){
             FILE *pF = fopen(f, "r+");
             if(pF){ //deB 
-                char *s = (char *)malloc(fSz+2);//deB// char *s = (char *)malloc(MAX_BUF_LEN);//deB
-                s[0] = ' '; s[fSz+1] = 0;//memset(s+fSz, 0, 2); 
-                if(s){ //deB
-                    int r = fread(s+1, 1, fSz, pF); int chg=0;//deB // memset(s, 0, 100);//for test 0 str
-                    trimBlockComment(s, &r, &chg); 
-                    if(chg){// do_md5(s, r);
-                        fseek(pF, 0L, SEEK_SET); printf(" %s\n", f);//deBV("%s", f);
-                        fwrite(s+1, 1, r, pF); } // int ftruncate(int fd, off_t length); // printf(" %s ", s); // fwrite(s, 1, statbuf.st_size, stdout);
-                    free(s);
+                gS = (char *)malloc(fSz+2);//deB// char *s = (char *)malloc(MAX_BUF_LEN);//deB
+                gS[0] = ' '; gS[fSz+1] = 0;//memset(gS+fSz, 0, 2); 
+                if(gS){ //deB
+                    int r = fread(gS+1, 1, fSz, pF); int chg=0;//deB // memset(gS, 0, 100);//for test 0 str
+                    trimBlockComment(gS, &r, &chg); 
+                    if(chg){// do_md5(gS, r);
+                        fseek(pF, 0L, SEEK_SET); printf(" %s\n", f);//deBV("%gS", f);
+                        fwrite(gS+1, 1, r, pF); } // int ftruncate(int fd, off_t length); // printf(" %s ", gS); // fwrite(gS, 1, statbuf.st_size, stdout);
+                    free(gS);
                 }else{
                     deBV("err malloc"); }
                 fclose(pF); } }// trim // while (fgets(buf, MAX_PATH, pF1)) { // 	char *t = NULL; // 	if ((t = strchr(buf, '\n'))) { // 		t[0] = 0; // 	} // 	FILE *pF2 = fopen(buf, "rb"); // 	if (pF2) { // 		strcat(buf, "XXXXXX"); // 		int fd = mkstemp(buf); // 		char buf1[MAX_BUF_LEN] = { 0 }; // 		while (fgets(buf1, MAX_BUF_LEN, pF2)) { // 			if(IsChar(buf1) >= 0){ // 				write(fd, buf1, strlen(buf1)); // 			} // 		} // 		close(fd); // 		fclose(pF2); // 		sprintf(buf1, "%s", buf); // 		buf1[strlen(buf1)-6] = 0; // 		rename(buf, buf1); // 	} // } // fclose(pF1); // unlink(OUT_FILE);
