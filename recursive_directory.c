@@ -7,6 +7,7 @@
 #include <limits.h> /*List the files in "dir_name". */
 #include <sys/types.h>
 #include <dirent.h>
+#define deBpri printf
 // static void list_dir (const char *dir_name) { DIR *d;     /*Open the directory specified by "dir_name". */
 //     d = opendir (dir_name);     /*Check it was opened. */
 //     if (! d) { fprintf (stderr, "Cannot open directory '%s': %s\n", dir_name, strerror (errno)); exit (EXIT_FAILURE); }
@@ -30,66 +31,76 @@
 // __dirstream r;
 #define MAX_CONNECT 4096*100
 int tcpStat[MAX_CONNECT];
-static void list_dir2 (const char *dir_name) { DIR *d;     /*Open the directory specified by "dir_name". */
-    printf(" \n\n map:\n\n");
+static int list_dir2 (const char *dir_name) { DIR *d;     /*Open the directory specified by "dir_name". */
+    deBpri(" \n\n map dirname:\n\n", dir_name);
     d = opendir (dir_name); 
-    int found = 0;
+    int found = 0; 
     if (d) {
         char link[256]; int r=0;
         int dirfd0 = dirfd(d); 
         int nCmp = strlen("socket:[");
         struct dirent *entry = readdir (d);
         while (entry) {
-            const char *d_name = entry->d_name; // printf(" na:%s len:%d %d \n", d_name, entry->d_reclen, strlen(d_name)); 
-            if (d_name[0] != '.' && d_name[1] != '.'){  //printf ("%s/%s\n", dir_name, d_name);       /*Print the name of the file and directory. */ 
+            const char *d_name = entry->d_name; // deBpri(" na:%s len:%d %d \n", d_name, entry->d_reclen, strlen(d_name)); 
+            if (d_name[0] != '.' && d_name[1] != '.'){  deBpri (" d_name:%s\n", d_name);       /*Print the name of the file and directory. */ 
                 link[0] = 0; 
                 r=readlinkat(dirfd0, d_name, link, 256);
                 if( r > 0 && r< 256 ){
                     link[r] = 0;
                     if(!strncmp("socket:[", link, nCmp)) { 
                         int ino = atoi(link+nCmp);
-                        printf(" linkggg:%s len:%d ino:%d ", link, entry->d_reclen, ino); 
+                        deBpri(" link:%s  ino:%d ", link, ino); 
                         for(int i=0;i<MAX_CONNECT; i++){
-                            if(tcpStat[i]){
-                                printf(" %d ", tcpStat[i]);
+                            if(tcpStat[i]){ // deBpri(" %d ", tcpStat[i]);
                                 if(tcpStat[i] == ino){
-                                    printf("\n found:%d \n", tcpStat[i]);
+                                    deBpri("\n found:%d \n", tcpStat[i]);
                                     found=1;
                                     break; }
                             } else
-                                break; 
-                        } } }; }
+                                break; } } }; }
             if(found)break;
             entry = readdir (d); }
         closedir(d);
     }else{
         fprintf (stderr, "Cannot open directory '%s': %s\n", dir_name, strerror (errno)); exit (EXIT_FAILURE); } 
-    // printf("\n uuuuuuuuuu \n");
+    deBpri("\n uuuuuuuuuu \n");
+    return found;
 }
 int main (int argc, char *argv[]) {
     FILE *pF = fopen("/proc/net/tcp", "rb");
-    char buf[4096] = {0};
+    char buf[4096] = {0}; int tcpStatSn = 0;
     if(pF){
         if(!fgets(buf, sizeof(buf), pF)) return 0; //skip header.
-        memset(buf+34, 0, 3);
-        int i = 0;
-        while (i<MAX_CONNECT && fgets(buf, sizeof(buf), pF)) { //printf(" jjjj0:%s ooo:%s ", buf, buf+34);
-            if(!strncmp(buf+34, "01 ", 3)){ // printf(" jjjj:%s node:\n%d ", buf, atoi(buf+91));
-                tcpStat[i++] = atoi(buf+91);
+        memset(buf+34, 0, 3); deBpri("\n  tcp: \n");
+        while (tcpStatSn<MAX_CONNECT && fgets(buf, sizeof(buf), pF)) { deBpri(" buf:%s st:%s nodeS:%s\n", buf, buf+34, buf+91);
+            if(!strncmp(buf+34, "01 ", 3)){  deBpri(" node:%d \n", atoi(buf+91));
+                tcpStat[tcpStatSn++] = atoi(buf+91);
             } }
         fclose(pF);}
-    // int i = 0;
-    // printf(" list:\n\n");
-    // for(i=0;i<MAX_CONNECT; i++){
-    //     if(tcpStat[i])
-    //         printf(" %d ", tcpStat[i]);
-    //     else
-    //         break; 
-    // }
-    // list_dir ("/proc");///usr/share/games");
-    if(argc == 2){ //printf(" \n dddddddddddd:%s \n", argv[1]);
+    pF = fopen("/proc/net/tcp6", "rb");
+    if(pF){
+        if(!fgets(buf, sizeof(buf), pF)) return 0; //skip header.
+        memset(buf+82, 0, 3); deBpri("\n  tcp6: \n");
+        while (tcpStatSn<MAX_CONNECT && fgets(buf, sizeof(buf), pF)) {  deBpri(" buf:%s st:%s nodeS:%s", buf, buf+82, buf+139);
+            if(!strncmp(buf+82, "01 ", 3)){ deBpri(" node:%d \n", atoi(buf+139));// deBpri(" jjjj:%s node:\n%d ", buf, atoi(buf+91));
+                tcpStat[tcpStatSn++] = atoi(buf+139);
+            } }
+        fclose(pF);}
+#if 1 //for debug
+    int i = 0;
+    deBpri(" tcp list:\n");
+    for(i=0;i<MAX_CONNECT; i++){
+        if(tcpStat[i])
+            deBpri(" %d ", tcpStat[i]); 
+        else
+            break; 
+    }
+#endif // list_dir ("/proc");///usr/share/games");
+    int r = 0;
+    if(argc == 2){ //deBpri(" \n dddddddddddd:%s \n", argv[1]);
         sprintf(buf, "/proc/%s/fd", argv[1]);
-        list_dir2 (buf);// "/proc/30514/fd");///usr/share/games");
+        r = list_dir2 (buf);// "/proc/30514/fd");///usr/share/games"); 
     }else {
-        list_dir2 ("/proc/22990/fd");}
+        r = list_dir2 ("/proc/22990/fd");}
+    printf("\n result:%d \n", r);
     return 0; }
