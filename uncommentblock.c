@@ -145,7 +145,7 @@ static int trimBlockComment(char *s, int *lenI, int *chg) { int len = *lenI; int
                 if(t2[1]=='/'){  // find first */ // fwrite("\n\n\n", 1, 3, stdout); fwrite(t, 1, 10, stdout);
                     sR = t2+2;
                     tranRet2Nullb(t+2, t2-t-2, chg);
-                    for(int i=t-s-1; i>0; i--){//trim prefix \n,\t,\b...
+                    for(int i=t-s-1; i>0; i--){//trim prefix \n,\t,\b... 
                         if(isspace(s[i])){//s[i]=='\n'||s[i]=='\t' || ){
                             if(s[i] != ' '){
                                 s[i] = ' ';
