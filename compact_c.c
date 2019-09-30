@@ -125,33 +125,33 @@
 //         }
 //     }
 // }
-static tranRet2Nullb(char *s, int len, int *chg){ //*chg = 0;
-    for(int i=0;i<len; i++){
-        if(s[i]=='\n'){
-            s[i] = ' ';
-            *chg = 1;// s[i] = 0;
-        } } }
-static int trimBlockComment(char *s, int *lenI, int *chg) { int len = *lenI; int beg=0; int end=0; //*chg = 0; //deB//printf("%s\n", s);
-    char *t = 0;//g ets(s);
-    char *t2 = 0; int ind0=0,ind1=0,ind2=0,ind3=0;
-    char *sR = s;
-    while(t = strchr(sR, '/')){ //printf(" %d ", t-s);
-        sR = t+1;
-        if(t[1]=='*'){ // find first /* // ind0 = ;
-            sR = t+2;
-            char *sR2 = t+1;
-            while( (t2 = strchr(sR2, '*')) ){
-                 sR2 = sR2+1;
-                if(t2[1]=='/'){  // find first */ // fwrite("\n\n\n", 1, 3, stdout); fwrite(t, 1, 10, stdout);
-                    sR = t2+2;
-                    tranRet2Nullb(t+2, t2-t-2, chg);
-                    for(int i=t-s-1; i>0; i--){//trim prefix \n,\t,\b... 
-                        if(isspace(s[i])){//s[i]=='\n'||s[i]=='\t' || ){
-                            if(s[i] != ' '){
-                                s[i] = ' ';
-                                *chg = 1;}
-                        }else break; }
-                    break; } } } } } // compact ) {
+// static tranRet2Nullb(char *s, int len, int *chg){ //*chg = 0;
+//     for(int i=0;i<len; i++){
+//         if(s[i]=='\n'){
+//             s[i] = ' ';
+//             *chg = 1;// s[i] = 0;
+//         } } }
+// static int trimBlockComment(char *s, int *lenI, int *chg) { int len = *lenI; int beg=0; int end=0; //*chg = 0; //deB//printf("%s\n", s);
+//     char *t = 0;//g ets(s);
+//     char *t2 = 0; int ind0=0,ind1=0,ind2=0,ind3=0;
+//     char *sR = s;
+//     while(t = strchr(sR, '/')){ //printf(" %d ", t-s);
+//         sR = t+1;
+//         if(t[1]=='*'){ // find first /* // ind0 = ;
+//             sR = t+2;
+//             char *sR2 = t+1;
+//             while( (t2 = strchr(sR2, '*')) ){
+//                  sR2 = sR2+1;
+//                 if(t2[1]=='/'){  // find first */ // fwrite("\n\n\n", 1, 3, stdout); fwrite(t, 1, 10, stdout);
+//                     sR = t2+2;
+//                     tranRet2Nullb(t+2, t2-t-2, chg);
+//                     for(int i=t-s-1; i>0; i--){//trim prefix \n,\t,\b... 
+//                         if(isspace(s[i])){//s[i]=='\n'||s[i]=='\t' || ){
+//                             if(s[i] != ' '){
+//                                 s[i] = ' ';
+//                                 *chg = 1;}
+//                         }else break; }
+//                     break; } } } } } // compact ) {
 static int compact1(char *s, int *lenI, int *chg) { int len = *lenI; int beg=0; int end=0; //*chg = 0; //deB//printf("%s\n", s);
     char *t = 0;//g ets(s);
     char *t2 = 0; int ind0=0,ind1=0,ind2=0,ind3=0;
@@ -169,7 +169,27 @@ static int compact2(char *s, int *lenI, int *chg) { int len = *lenI; int beg=0; 
     while(t = strstr(sR, SYM2) ){ //printf(" %d ", t-s);
         t[0] = ' ';
         sR = t+offL;
-        *chg = 1; }}
+        *chg = 1; }}// #include <   or  #include "
+static int compact3(char *s, int *lenI, int *chg) { int len = *lenI; int beg=0; int end=0; //*chg = 0; //deB//printf("%s\n", s);
+    char *t = 0;//g ets(s);
+    char *t2 = 0; int ind0=0,ind1=0,ind2=0,ind3=0;
+    char * SYM3 = "\n#include ";
+    char *sR = s; int offL = strlen(SYM3);
+    while(t = strstr(sR, SYM3) ){ //printf(" %d ", t-s);
+        t[0] = ' ';
+        sR = t+offL;
+        *chg = 1; }}// compact &	
+// static int compact4(char *s, int *lenI, int *chg) { int len = *lenI; int beg=0; int end=0; //*chg = 0; //deB//printf("%s\n", s);
+//     char *t = 0;//g ets(s);
+//     char *t2 = 0; int ind0=0,ind1=0,ind2=0,ind3=0; // char * SYM4 = "&";
+//     char *sR = s; //int offL = strlen(SYM3);
+//     while(t = strchr(sR, '&') ){ //printf(" %d ", t-s);
+//         sR = t+1;
+//         for(int i=t-s+1; i<*lenI; i++){
+//             if(isspace(s[i])){ sR++;
+//                 if(s[i]!=' '){ s[i] = ' '; *chg = 1; }
+//             }else break; } 
+//         }}
 char *gS = 0;
 // static int trimLargeBlock(char *f){ struct stat statbuf; //deB
 //     if(!f && !f[0]) return -1;// const char pathname[256];
@@ -204,7 +224,9 @@ static int trimLargeBlock(char *f){ struct stat statbuf; //deB
                 if(gS){ //deB
                     int r = fread(gS+1, 1, fSz, pF); int chg=0;//deB // memset(gS, 0, 100);//for test 0 str
                     compact1(gS, &r, &chg); 
-                    compact2(gS, &r, &chg); 
+                    compact2(gS, &r, &chg);
+                    compact3(gS, &r, &chg);
+                    // compact4(gS, &r, &chg);
                     if(chg){// do_md5(gS, r);
                         fseek(pF, 0L, SEEK_SET); printf(" %s\n", f);//deBV("%gS", f);
                         fwrite(gS+1, 1, r, pF); } // int ftruncate(int fd, off_t length); // printf(" %s ", gS); // fwrite(gS, 1, statbuf.st_size, stdout);
