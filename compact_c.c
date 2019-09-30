@@ -152,6 +152,18 @@
 //                                 *chg = 1;}
 //                         }else break; }
 //                     break; } } } } } // compact ) {
+static int compact0(char *s, int *lenI, int *chg) { int len = *lenI; int beg=0; int end=0; //*chg = 0; //deB//printf("%s\n", s);
+    char *t = 0;//g ets(s);
+    char *t2 = 0; int ind0=0,ind1=0,ind2=0,ind3=0;
+    char * SYM1 = ")\n{";
+    char *sR = s; int offL = strlen(SYM1);
+    while(t = strchr(sR, '\n')){ //printf(" %d ", t-s);
+        sR = t+1;
+        for(int i=t-s-1; i>=0; i--){
+            if(isspace(s[i])){
+                if(s[i]!=' '){ s[i] = ' '; *chg = 1; }
+            }else break; }
+         }}
 static int compact1(char *s, int *lenI, int *chg) { int len = *lenI; int beg=0; int end=0; //*chg = 0; //deB//printf("%s\n", s);
     char *t = 0;//g ets(s);
     char *t2 = 0; int ind0=0,ind1=0,ind2=0,ind3=0;
@@ -223,7 +235,8 @@ static int trimLargeBlock(char *f){ struct stat statbuf; //deB
                 gS[0] = ' '; gS[fSz+1] = 0;//memset(gS+fSz, 0, 2); 
                 if(gS){ //deB
                     int r = fread(gS+1, 1, fSz, pF); int chg=0;//deB // memset(gS, 0, 100);//for test 0 str
-                    compact1(gS, &r, &chg); 
+                    compact0(gS, &r, &chg);
+                    compact1(gS, &r, &chg);
                     compact2(gS, &r, &chg);
                     compact3(gS, &r, &chg);
                     // compact4(gS, &r, &chg);
