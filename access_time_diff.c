@@ -6,7 +6,7 @@ int main(int argc,char *argv[]){
     struct stat buf;
     if(argc == 3){
         if(!stat(argv[2], &buf)){
-            if(buf.st_atime != buf.st_mtime) printf("%s\n", argv[1]);
+            if(buf.st_atime != buf.st_mtime) printf("%s\n", argv[2]);
         }else {
             printf("no %s\n", argv[1]);
         }
