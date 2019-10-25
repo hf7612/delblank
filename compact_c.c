@@ -1,7 +1,4 @@
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <openssl/md5.h>
-// #define BUFSIZE 1024*16
+// gcc compact_c.c -std=c99 // #include <stdio.h> // #include <stdlib.h> // #include <openssl/md5.h> // #define BUFSIZE 1024*16
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -209,7 +206,15 @@ static int compact5(char *s, int *lenI, int *chg) { int len = *lenI; int beg=0; 
             if(isspace(s[i])){
                 if(s[i]!=' '){ s[i] = ' '; *chg = 1; }
             }else break; } 
-        sR = t+offL; }}
+        sR = t+offL; }}//
+static int compact6(char *s, int *lenI, int *chg) { //int len = *lenI; int beg=0; int end=0; //*chg = 0; //deB//printf("%s\n", s);
+    char *t = 0;//g ets(s); char *t2 = 0; //int ind0=0,ind1=0,ind2=0,ind3=0;
+    char * SYM = "\nimport ";
+    char *sR = s; int offL = strlen(SYM);
+    while(t = strstr(sR, SYM) ){ //printf(" %d ", t-s);
+        t[0] = ' ';
+        sR = t+offL;
+        *chg = 1; }}//import 
 // static int compact4(char *s, int *lenI, int *chg) { int len = *lenI; int beg=0; int end=0; //*chg = 0; //deB//printf("%s\n", s);
 //     char *t = 0;//g ets(s);
 //     char *t2 = 0; int ind0=0,ind1=0,ind2=0,ind3=0; // char * SYM4 = "&";
@@ -260,6 +265,7 @@ static int trimLargeBlock(char *f){ struct stat statbuf; //deB
                     compact3(gS, &r, &chg);
                     compact4(gS, &r, &chg);
                     compact5(gS, &r, &chg);
+                    compact6(gS, &r, &chg);
                     if(chg){// do_md5(gS, r);
                         fseek(pF, 0L, SEEK_SET); printf(" %s\n", f);//deBV("%gS", f);
                         fwrite(gS+1, 1, r, pF); } // int ftruncate(int fd, off_t length); // printf(" %s ", gS); // fwrite(gS, 1, statbuf.st_size, stdout);
