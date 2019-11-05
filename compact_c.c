@@ -207,6 +207,16 @@ static int compact5(char *s, int *lenI, int *chg) { int len = *lenI; int beg=0; 
                 if(s[i]!=' '){ s[i] = ' '; *chg = 1; }
             }else break; } 
         sR = t+offL; }}//
+static int compact5b(char *s, int *lenI, int *chg) { //int len = *lenI; int beg=0; int end=0; //*chg = 0; //deB//printf("%s\n", s);// spin_lock_ spin_unlock_
+    char *t = 0; char * SYM[] = {"raw_spin_", "spin_lock_", "spin_unlock_", "local_irq_", "raw_spin_lock", "spin_unlock(", "spin_lock(",  "local_bh_disable", 0}; int i=0; //g ets(s); char *t2 = 0; int ind0=0,ind1=0,ind2=0,ind3=0; 
+    while(SYM[i]){ char *sR = s; int offL = strlen(SYM[i]);
+        while(t = strstr(sR, SYM[i]) ){ //printf(" %d ", t-s); 
+            for(int i=t-s-1; i>=0; i--){
+                if(isspace(s[i])){
+                    if(s[i]!=' '){ s[i] = ' '; *chg = 1; }
+                }else break; } 
+            sR = t+offL; }
+        i++; } }
 static int compact6(char *s, int *lenI, int *chg) { //int len = *lenI; int beg=0; int end=0; //*chg = 0; //deB//printf("%s\n", s);
     char *t = 0;//g ets(s); char *t2 = 0; //int ind0=0,ind1=0,ind2=0,ind3=0;
     char * SYM = "\nimport ";
@@ -227,9 +237,8 @@ static int compact7(char *s, int *lenI, int *chg) { //int len = *lenI; int beg=0
             *chg = 1; }
         i++; }} //static inline
 static int compact8(char *s, int *lenI, int *chg) { //int len = *lenI; int beg=0; int end=0; //*chg = 0; //deB//printf("%s\n", s);
-    char *t = 0;//g ets(s); char *t2 = 0; //int ind0=0,ind1=0,ind2=0,ind3=0; static void
-    // char * SYM[] = {"\nstatic inline\n", "\nstatic void\n", "\nstatic inline void\n", "\t{\n", " long\n", " int\n", " void\n", 0}; int i=0;//unsigned long
-    char * SYM[] = {" inline\n", " void\n", "\t{\n", " long\n", " int\n", ",\n", 0}; int i=0;//unsigned long
+    char *t = 0;//g ets(s); char *t2 = 0; //int ind0=0,ind1=0,ind2=0,ind3=0; static void // char * SYM[] = {"\nstatic inline\n", "\nstatic void\n", "\nstatic inline void\n", "\t{\n", " long\n", " int\n", " void\n", 0}; int i=0;//unsigned long
+    char * SYM[] = {" inline\n", " void\n", "\t{\n", " long\n", " int\n", ",\n", "enum {\n", 0}; int i=0;//unsigned long
     while(SYM[i]){
         char *sR = s; int offL = strlen(SYM[i]);
         while(t = strstr(sR, SYM[i]) ){ //printf(" %d ", t-s);
@@ -287,6 +296,7 @@ static int trimLargeBlock(char *f){ struct stat statbuf; //deB
                     compact3(gS, &r, &chg);
                     compact4(gS, &r, &chg);
                     compact5(gS, &r, &chg);
+                    compact5b(gS, &r, &chg);
                     compact6(gS, &r, &chg);
                     compact7(gS, &r, &chg);
                     compact8(gS, &r, &chg);
