@@ -1,4 +1,4 @@
-// gcc compact_c.c -std=c99 // #include <stdio.h> // #include <stdlib.h> // #include <openssl/md5.h> // #define BUFSIZE 1024*16
+//  gcc compact_c.c -std=c99 -o /home/user/bin/compact_c    # // #include <stdio.h> // #include <stdlib.h> // #include <openssl/md5.h> // #define BUFSIZE 1024*16
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -208,7 +208,7 @@ static int compact5(char *s, int *lenI, int *chg) { int len = *lenI; int beg=0; 
             }else break; } 
         sR = t+offL; }}//
 static int compact5b(char *s, int *lenI, int *chg) { //int len = *lenI; int beg=0; int end=0; //*chg = 0; //deB//printf("%s\n", s);// spin_lock_ spin_unlock_
-    char *t = 0; char * SYM[] = {"raw_spin_", "spin_lock_", "spin_unlock_", "local_irq_", "raw_spin_lock", "spin_unlock(", "spin_lock(",  "local_bh_disable", 0}; int i=0; //g ets(s); char *t2 = 0; int ind0=0,ind1=0,ind2=0,ind3=0; 
+    char *t = 0; char * SYM[] = {"raw_spin_", "spin_lock_", "spin_unlock_", "local_irq_", "raw_spin_lock", "spin_unlock(", "spin_lock(",  "local_bh_disable", "mutex_lock", "mutex_unlock", 0}; int i=0; //g ets(s); char *t2 = 0; int ind0=0,ind1=0,ind2=0,ind3=0; 
     while(SYM[i]){ char *sR = s; int offL = strlen(SYM[i]);
         while(t = strstr(sR, SYM[i]) ){ //printf(" %d ", t-s); 
             for(int i=t-s-1; i>=0; i--){
