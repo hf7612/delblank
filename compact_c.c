@@ -238,7 +238,7 @@ static int compact7(char *s, int *lenI, int *chg) { //int len = *lenI; int beg=0
         i++; }} //static inline
 static int compact8(char *s, int *lenI, int *chg) { //int len = *lenI; int beg=0; int end=0; //*chg = 0; //deB//printf("%s\n", s);
     char *t = 0;//g ets(s); char *t2 = 0; //int ind0=0,ind1=0,ind2=0,ind3=0; static void // char * SYM[] = {"\nstatic inline\n", "\nstatic void\n", "\nstatic inline void\n", "\t{\n", " long\n", " int\n", " void\n", 0}; int i=0;//unsigned long
-    char * SYM[] = {" inline\n", " void\n", "\t{\n", " long\n", " int\n", ",\n", "enum {\n", 0}; int i=0;//unsigned long
+    char * SYM[] = {" inline\n", " void\n", "\t{\n", " long\n", " int\n", ",\n", "\nvoid\n", "\nint\n", "*\n", 0}; int i=0;//unsigned long
     while(SYM[i]){
         char *sR = s; int offL = strlen(SYM[i]);
         while(t = strstr(sR, SYM[i]) ){ //printf(" %d ", t-s);
