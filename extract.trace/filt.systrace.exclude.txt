@@ -1,0 +1,70 @@
+cgroup_attach_task
+ cpu_idle:
+oom_score_adj_update
+sched_process_exit
+sched_switch: prev_comm=
+sched_wakeup: comm=
+task_newtask: pid=
+task_rename: pid=
+bool art::
+bindExternal
+JIT inline
+monitor contention
+ProfileCompilationInfo::
+serviceStart: ServiceArgsData
+SweepAllocSpace
+SweepLargeObjects
+SweepSystemWeaks
+OomAdj
+art::gc::
+Heap size 
+Broadcast dispatched
+NavigationBar0
+StatusBar
+sensorev
+sensorser
+binder:
+heaptask
+Jit thread
+ \[efu\] 
+NetworkMonitor
+gnss@
+Profile Saver
+googlequicksearchbox
+networksta
+hardware.sensor
+com.google.android
+com.android.phone
+com.google.
+gms.persistent
+android.gms
+android.phone
+sensors@
+atrace
+earchbox
+copying gc
+copying
+hwui_layer
+lumasampl
+timestats
+capturesample
+hwui_
+hwc relea
+systemui
+perfservice
+total buffer
+sprite#
+suspend@
+framemiss
+batterystat
+broadcast in
+activitymana
+Google
+Lock contention on
+binder_
+setVsyncEnabled
+hasClientComposition
+composer@
+powermanageser
+IComposerCallback
+sdm_event

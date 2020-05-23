@@ -1,0 +1,4 @@
+11120 execve("/home/user/bin/make_ping.sh", ["make_ping.sh", "/home/user/t/delblank/sysinfo_ex"...], [/* 81 vars */]) = -1 ENOEXEC (Exec format error)
+11120 write(2, "strace: exec: Exec format error\n", 32) = 32
+11120 exit_group(1)                     = ?
+11120 +++ exited with 1 +++

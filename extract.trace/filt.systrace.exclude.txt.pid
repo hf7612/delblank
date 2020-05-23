@@ -1,0 +1,45 @@
+cgroup_attach_task
+ cpu_idle:
+oom_score_adj_update
+sched_process_exit
+sched_switch: prev_comm=
+sched_wakeup: comm=
+task_newtask: pid=
+task_rename: pid=
+bool art::
+bindExternal
+JIT inline
+monitor contention
+ProfileCompilationInfo::
+serviceStart: ServiceArgsData
+SweepAllocSpace
+SweepLargeObjects
+SweepSystemWeaks
+OomAdj
+art::gc::
+Heap size 
+Broadcast dispatched
+NavigationBar0
+StatusBar
+sensorev
+sensorser
+binder:
+heaptask
+ \[efu\] 
+jit thread
+NetworkMonitor
+gnss@
+Profile Saver
+googlequicksearchbox
+networksta
+hardware.sensor
+com.google.android
+com.android.phone
+com.google.
+gms.persistent
+android.gms
+android.phone
+sensors@
+atrace
+earchbox
+copying gc
